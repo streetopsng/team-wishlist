@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+vite-dev.log
+.firebase
+firebase-debug.log
 
 # Editor directories and files
 .vscode/*

@@ -1,0 +1,90 @@
+{
+  "rules": {
+    "hostKeys": {
+      "$code": {
+        ".write": "!data.exists()",
+        ".validate": "newData.isString() && newData.val().length >= 32"
+      }
+    },
+    "claims": {
+      "$code": {
+        ".write": "true",
+        ".validate": "newData.isString() && newData.val() === root.child('hostKeys/' + $code).val()"
+      }
+    },
+    "sessions": {
+      "$code": {
+        ".read": true,
+        ".write": "!data.exists()",
+        "meta": {
+          ".write": "data.parent().child('claims/' + $code).val() === root.child('hostKeys/' + $code).val()",
+          ".validate": "newData.hasChildren(['name', 'phase', 'createdAt', 'cap'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80"
+          },
+          "phase": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "cap": {
+            ".validate": "newData.isNumber()"
+          },
+          "invitedCount": {
+            ".validate": "newData.isNumber()"
+          },
+          "source": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          }
+        },
+        "participants": {
+          "$pid": {
+            ".write": "!data.exists() || data.child('avatarId').val() === newData.child('avatarId').val()",
+            ".validate": "newData.hasChildren(['avatarId', 'joinedAt'])",
+            "avatarId": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 8" },
+            "joinedAt": { ".validate": "newData.isNumber()" },
+            "online": { ".validate": "newData.isBoolean()" },
+            "doneWishing": { ".validate": "newData.isBoolean()" },
+            "recapSeen": { ".validate": "newData.isBoolean()" },
+            "doneAllocating": { ".validate": "newData.isBoolean()" },
+            "doneResults": { ".validate": "newData.isBoolean()" },
+            "tokens": {
+              "$cid": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3"
+              }
+            }
+          }
+        },
+        "avatars": {
+          "$avatarId": {
+            ".write": "!data.exists() || newData.val() === null",
+            ".validate": "newData.isString()"
+          }
+        },
+        "wishes": {
+          "$wid": {
+            ".write": "!data.exists() || (data.parent().parent().child('claims/' + $code).val() === root.child('hostKeys/' + $code).val() && newData.child('text').val() === data.child('text').val() && newData.child('authorPid').val() === data.child('authorPid').val() && newData.child('avatarId').val() === data.child('avatarId').val() && newData.child('createdAt').val() === data.child('createdAt').val())",
+            ".validate": "newData.hasChildren(['text', 'authorPid', 'avatarId', 'createdAt']) && newData.child('text').val().length > 0 && newData.child('text').val().length <= 90",
+            "collectiveId": { ".validate": "newData.isString() || newData.val() === null" }
+          }
+        },
+        "collectives": {
+          "$cid": {
+            ".write": "!data.exists() || (data.parent().parent().child('claims/' + $code).val() === root.child('hostKeys/' + $code).val() && newData.child('title').val() === data.child('title').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('autoPromoted').val() === data.child('autoPromoted').val())",
+            ".validate": "newData.hasChildren(['title', 'createdAt'])",
+            "title": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 90" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "autoPromoted": { ".validate": "newData.isBoolean()" }
+          }
+        },
+        "reveal": {
+          "index": {
+            ".write": "data.parent().parent().child('claims/' + $code).val() === root.child('hostKeys/' + $code).val()",
+            ".validate": "newData.isNumber()"
+          }
+        }
+      }
+    }
+  }
+}

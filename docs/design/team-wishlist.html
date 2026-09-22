@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Team Wishlist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F1FB; --panel:#FFFFFF; --panel-2:#F1E9FB;
+  --ink:#241934; --muted:#8A7FA0; --muted-2:#B4A9CB;
+  --orange:#8B5CF6; --orange-deep:#6D3FD1; --orange-tint:#EFE6FC;
+  --line:#241934;
+  --green:#6FD48A; --green-light:#DCF5E2;
+  --blue:#59A9E8; --blue-light:#DBEBFA;
+  --pink:#F17FAE; --pink-light:#FBDCE9;
+  --yellow:#F6D94E; --yellow-light:#FBF0BC;
+  --coral:#F5934D; --coral-light:#FCE3CC;
+  --radius:18px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg); color:var(--ink); font-family:'Poppins',sans-serif;
+  min-height:100vh; position:relative; overflow-x:hidden;
+}
+h1,h2,h3{ font-family:'Baloo 2',sans-serif; margin:0; }
+button{ font-family:'Poppins',sans-serif; cursor:pointer; }
+:focus-visible{ outline:3px solid var(--orange); outline-offset:2px; }
+textarea,input{ font-family:'Poppins',sans-serif; }
+
+/* ---------------- background texture (signature motif) ---------------- */
+.bg-texture{ position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+.bg-icon{ position:absolute; color:var(--ink); opacity:0.07; }
+.bg-swirl{ position:absolute; width:90px; height:46px; border:2px solid var(--ink); opacity:0.08; border-radius:50%; transform:rotate(-18deg); }
+.bg-swirl::before{ content:""; position:absolute; width:70px; height:36px; left:8px; top:4px; border:2px solid var(--ink); border-radius:50%; }
+.bg-dots{ position:absolute; width:14px; height:14px; opacity:0.15; }
+.bg-dots span{ display:block; width:4px; height:4px; border-radius:50%; background:var(--orange); position:absolute; }
+
+/* ---------------- layout ---------------- */
+.screen{ position:relative; z-index:2; max-width:760px; margin:0 auto; padding:30px 20px 70px; }
+.center-screen{ text-align:center; display:flex; flex-direction:column; align-items:center; padding-top:10vh; min-height:70vh; }
+.eyebrow{ font-family:'Poppins',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--orange-deep); margin-bottom:10px; }
+.section-title{ font-size:clamp(22px,4vw,32px); font-weight:700; margin-bottom:10px; max-width:520px; }
+.section-sub{ color:var(--muted); font-size:15.5px; line-height:1.6; max-width:440px; margin-bottom:24px; }
+.back-link{ background:none; border:none; color:var(--muted); font-weight:600; font-size:14px; margin-bottom:18px; align-self:flex-start; }
+.back-link:hover{ color:var(--ink); }
+
+/* ---------------- buttons ---------------- */
+.btn2{ font-weight:700; font-size:15px; border-radius:999px; border:2.5px solid var(--line); padding:14px 28px;
+  box-shadow:4px 4px 0 var(--line); transition:transform .08s ease, box-shadow .08s ease; background:var(--panel); color:var(--ink); }
+.btn2:active:not(:disabled){ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--line); }
+.btn2.orange{ background:var(--orange); color:#FFFFFF; }
+.btn2.ghost{ background:var(--panel-2); color:var(--ink); }
+.btn2.full{ width:100%; display:block; }
+.btn2:disabled{ opacity:0.4; cursor:not-allowed; box-shadow:2px 2px 0 var(--line); }
+.link-btn2{ background:none; border:none; color:var(--orange-deep); font-weight:700; font-size:13px; text-decoration:underline; text-underline-offset:3px; padding:0; }
+
+/* ---------------- landing ---------------- */
+.landing{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 20px; position:relative; }
+.landing-content{ position:relative; z-index:2; text-align:center; max-width:640px; }
+.landing-title{ font-size:clamp(50px,10vw,104px); line-height:0.94; font-weight:800; color:var(--ink); letter-spacing:-0.01em; }
+.landing-title span{ color:var(--orange); }
+.landing-statement{ font-size:clamp(15px,2.2vw,19px); color:var(--muted); max-width:520px; margin:22px auto 28px; line-height:1.55; font-weight:500; }
+.landing-actions{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-bottom:16px; }
+.landing-footnote{ font-size:13px; color:var(--muted-2); font-weight:500; }
+.drift-word{ position:absolute; font-weight:700; font-size:11.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--orange-deep);
+  background:var(--panel); border:2px solid var(--line); border-radius:999px; padding:6px 14px; box-shadow:3px 3px 0 var(--line); opacity:0.9; }
+@media(max-width:640px){ .drift-word{ display:none; } }
+
+/* ---------------- generic sub-cards / entry ---------------- */
+.entry-choices{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin-top:6px; }
+.entry-card{ background:var(--panel); border:2.5px solid var(--line); border-radius:var(--radius); box-shadow:5px 5px 0 var(--line);
+  padding:26px; width:250px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; text-align:left; color:var(--ink);
+  transition:transform .1s ease; }
+.entry-card:hover{ transform:translate(-2px,-2px); box-shadow:7px 7px 0 var(--line); }
+.entry-card-emoji{ font-size:28px; margin-bottom:4px; }
+.entry-card-title{ font-family:'Baloo 2',sans-serif; font-size:19px; font-weight:700; }
+.entry-card-sub{ font-size:13px; color:var(--muted); line-height:1.4; }
+
+/* ---------------- avatar chip / grid ---------------- */
+.avatar-chip{ display:inline-flex; align-items:center; justify-content:center; border-radius:50%; border:2px solid var(--line); flex-shrink:0; }
+.avatar-chip.sm{ width:26px; height:26px; font-size:13px; }
+.avatar-chip.md{ width:38px; height:38px; font-size:18px; }
+.avatar-chip.lg{ width:96px; height:96px; font-size:44px; }
+.bg-green{ background:var(--green); } .bg-blue{ background:var(--blue); } .bg-pink{ background:var(--pink); }
+.bg-yellow{ background:var(--yellow); } .bg-coral{ background:var(--coral); } .bg-greenLight{ background:var(--green-light); }
+
+.avatar-grid2{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:420px; margin:6px auto 24px; }
+.avatar-cell{ position:relative; aspect-ratio:1; border-radius:50%; border:2.5px solid var(--line); display:flex; align-items:center;
+  justify-content:center; font-size:30px; transition:transform .1s ease; }
+.avatar-cell:hover{ transform:translateY(-2px); }
+.avatar-cell.selected{ outline:3.5px solid var(--orange); outline-offset:3px; }
+.avatar-confirm-row{ display:flex; gap:14px; align-items:center; justify-content:center; flex-wrap:wrap; }
+
+/* ---------------- entering / loader ---------------- */
+.loader-circle{ width:110px; height:110px; border-radius:50%; background:var(--orange); display:flex; align-items:center; justify-content:center;
+  font-size:50px; margin-bottom:22px; border:2.5px solid var(--line); animation: pulseScale 1.1s ease-in-out infinite; }
+@keyframes pulseScale{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.06); } }
+.loader-text{ font-weight:700; font-size:17px; }
+
+/* ---------------- bracket frame (signature component) ---------------- */
+.bracket-frame{ position:relative; border:2.5px solid var(--orange); border-radius:22px; background:var(--panel);
+  clip-path:polygon(16px 0,calc(100% - 16px) 0,100% 16px,100% calc(100% - 16px),calc(100% - 16px) 100%,16px 100%,0 calc(100% - 16px),0 16px);
+  padding:34px 26px 26px; margin-bottom:22px; }
+.bracket-tab{ position:absolute; top:0; left:50%; transform:translate(-50%,-50%); display:flex; gap:4px; background:var(--bg); padding:4px 10px; }
+.bracket-tab.bottom{ top:auto; bottom:0; transform:translate(-50%,50%); }
+.bracket-tab span{ width:14px; height:5px; background:var(--orange); transform:skewX(-22deg); border-radius:1px; }
+.corner-dots{ position:absolute; width:20px; height:14px; display:grid; grid-template-columns:repeat(2,1fr); gap:3px; }
+.corner-dots span{ width:4px; height:4px; border-radius:50%; background:var(--orange); }
+.corner-dots.tl{ top:12px; left:12px; } .corner-dots.tr{ top:12px; right:12px; }
+.corner-dots.bl{ bottom:12px; left:12px; } .corner-dots.br{ bottom:12px; right:12px; }
+.bracket-eyebrow{ text-align:center; font-weight:700; font-size:11.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.bracket-title{ text-align:center; font-size:clamp(19px,3vw,24px); font-weight:700; margin-bottom:4px; }
+.bracket-title .dot{ color:var(--orange); margin:0 8px; }
+
+/* ---------------- stat row ---------------- */
+.stat-row{ display:flex; gap:12px; flex-wrap:wrap; padding-bottom:16px; border-bottom:3px solid var(--orange); margin-bottom:20px; }
+.stat-box{ background:var(--panel-2); border:2px solid var(--line); border-radius:14px; padding:10px 16px; min-width:96px; flex:1; }
+.stat-label{ display:flex; align-items:center; gap:5px; font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:2px; }
+.stat-value{ font-family:'Baloo 2',sans-serif; font-size:24px; font-weight:700; color:var(--ink); }
+
+/* ---------------- phase headers ---------------- */
+.room-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:8px; }
+.room-count{ font-weight:700; font-size:12px; color:var(--muted); }
+.phase-badge{ font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; background:var(--orange-tint);
+  border:2px solid var(--orange); padding:5px 12px; border-radius:999px; color:var(--orange-deep); }
+.phase-title{ font-size:clamp(22px,4vw,30px); font-weight:700; margin-bottom:8px; }
+.phase-prompt{ color:var(--ink); font-size:15.5px; margin-bottom:4px; font-weight:500; }
+.phase-instruction{ color:var(--muted); font-size:13.5px; margin-bottom:18px; }
+
+/* ---------------- wishing ---------------- */
+.wish-counter{ font-weight:700; font-size:13px; color:var(--orange-deep); margin-bottom:12px; }
+.wish-input-row{ display:flex; flex-direction:column; gap:10px; margin-bottom:8px; }
+.wish-input{ width:100%; min-height:64px; resize:vertical; background:var(--panel); color:var(--ink); border:2.5px solid var(--line);
+  border-radius:14px; padding:14px 16px; font-size:15.5px; line-height:1.4; }
+.wish-input::placeholder{ color:var(--muted-2); }
+.wish-ack{ font-size:13px; font-weight:600; color:var(--orange-deep); margin-bottom:14px; }
+.your-wishes{ display:flex; flex-direction:column; gap:8px; margin:16px 0 30px; }
+.your-wish-row{ background:var(--panel); border:2px solid var(--line); border-radius:12px; padding:10px 14px; font-size:14px; font-weight:500; }
+.your-wish-row .check{ color:var(--green); font-weight:700; margin-right:6px; }
+.wishing-footer{ margin-top:22px; }
+
+/* ---------------- waiting ---------------- */
+.waiting-orbit{ position:relative; width:150px; height:150px; margin-bottom:24px; }
+.orbit-avatar{ position:absolute; top:50%; left:50%; transform-origin:0 0; animation: orbit 6s linear infinite; }
+.orbit-avatar:nth-child(1){ --d:0deg; } .orbit-avatar:nth-child(2){ --d:60deg; } .orbit-avatar:nth-child(3){ --d:120deg; }
+.orbit-avatar:nth-child(4){ --d:180deg; } .orbit-avatar:nth-child(5){ --d:240deg; } .orbit-avatar:nth-child(6){ --d:300deg; }
+@keyframes orbit{ from{ transform:rotate(var(--d)) translateX(64px) rotate(calc(-1 * var(--d))); }
+  to{ transform:rotate(calc(var(--d) + 360deg)) translateX(64px) rotate(calc(-1 * (var(--d) + 360deg))); } }
+.ready-count{ font-weight:700; font-size:14px; color:var(--orange-deep); margin-bottom:10px; }
+.ready-bar{ width:220px; height:8px; border-radius:999px; background:var(--panel-2); border:2px solid var(--line); overflow:hidden; }
+.ready-bar-fill{ height:100%; background:var(--orange); transition:width .5s ease; }
+
+/* ---------------- idea wall ---------------- */
+.idea-wall{ display:flex; flex-wrap:wrap; gap:14px; margin:18px 0 30px; }
+.wish-note{ background:var(--panel); border:2.5px solid var(--line); box-shadow:3px 3px 0 var(--line); border-radius:14px; padding:12px 14px;
+  text-align:left; max-width:210px; font-size:13.5px; line-height:1.35; font-weight:500; transition:transform .12s ease, box-shadow .12s ease, opacity .2s; }
+.wish-note:not(:disabled):hover{ transform:translate(-2px,-2px); box-shadow:5px 5px 0 var(--line); }
+.wish-note-avatar{ display:block; margin-bottom:6px; }
+.wish-note-selected{ background:var(--orange-tint); border-color:var(--orange); box-shadow:5px 5px 0 var(--orange-deep); transform:translate(-2px,-2px) !important; }
+.wish-note-muted{ opacity:0.28; filter:grayscale(0.5); }
+.wall-caption{ font-weight:700; font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em; }
+
+/* ---------------- matching ---------------- */
+.match-bar{ position:sticky; bottom:14px; margin-top:20px; background:var(--panel); border:2.5px solid var(--orange);
+  border-radius:16px; padding:14px 18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; box-shadow:5px 5px 0 var(--line); z-index:5; }
+.match-bar-question{ font-family:'Baloo 2',sans-serif; font-style:normal; font-weight:700; color:var(--orange-deep); flex:1; }
+.match-bar-actions{ display:flex; gap:10px; }
+.naming-panel{ margin-top:20px; background:var(--panel); border:2.5px solid var(--line); border-radius:16px; padding:20px; box-shadow:4px 4px 0 var(--line); }
+.naming-lead{ font-size:13px; color:var(--muted); margin-bottom:10px; font-weight:600; }
+.naming-quotes{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+.naming-quote{ font-style:italic; color:var(--ink); font-size:14px; opacity:0.8; }
+.naming-input{ width:100%; background:var(--panel-2); color:var(--ink); border:2.5px solid var(--line); border-radius:10px; padding:12px 14px; font-size:15px; margin-bottom:14px; }
+.naming-actions{ display:flex; gap:10px; justify-content:flex-end; }
+.collective-strip{ display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
+.mini-collective{ background:var(--green-light); border:2px solid var(--line); border-radius:12px; padding:8px 12px; font-size:12px; display:flex; flex-direction:column; gap:2px; }
+.mini-collective strong{ font-family:'Baloo 2',sans-serif; font-size:13px; }
+.mini-collective span{ color:var(--muted); font-weight:600; font-size:11px; }
+
+/* ---------------- collective cards ---------------- */
+.collective-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; margin:18px 0 24px; }
+.collective-grid-compact{ grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); margin:20px 0; }
+.collective-card{ position:relative; background:var(--panel); border:2.5px solid var(--line); box-shadow:4px 4px 0 var(--line);
+  border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:6px; }
+.collective-card.top{ border-color:var(--orange); box-shadow:5px 5px 0 var(--orange-deep); background:var(--orange-tint); }
+.rank-badge{ position:absolute; top:14px; right:16px; font-family:'Baloo 2',sans-serif; color:var(--orange-deep); font-size:14px; font-weight:700; }
+.collective-title{ font-size:16.5px; font-weight:700; padding-right:30px; font-family:'Baloo 2',sans-serif; }
+.collective-count{ font-weight:600; font-size:12px; color:var(--muted); margin-bottom:4px; }
+.collective-points{ font-weight:700; font-size:13px; color:var(--orange-deep); }
+.collective-avatars{ display:flex; gap:4px; margin-bottom:4px; }
+.original-wishes-list{ margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--muted); line-height:1.6; }
+.final-chip{ background:var(--panel); border:2px solid var(--line); border-radius:12px; padding:12px; font-size:13px; text-align:center; font-weight:600; }
+
+/* ---------------- tokens ---------------- */
+.token-control{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.token-dots{ display:inline-flex; gap:6px; }
+.dot{ width:12px; height:12px; border-radius:50%; border:2px solid var(--orange-deep); display:inline-block; }
+.dot-filled{ background:var(--orange); border-color:var(--orange-deep); }
+.token-buttons{ display:flex; gap:6px; }
+.token-btn{ width:30px; height:30px; border-radius:50%; border:2px solid var(--line); background:var(--panel-2); color:var(--ink); font-size:16px; line-height:1; font-weight:700; }
+.token-btn:disabled{ opacity:0.3; }
+.token-btn-add{ background:var(--orange); color:#FFFFFF; border:2px solid var(--line); }
+.your-priorities{ display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap; background:var(--panel); border:2px solid var(--line);
+  border-radius:14px; padding:12px 16px; box-shadow:3px 3px 0 var(--line); }
+.your-priorities-label{ font-size:11.5px; text-transform:uppercase; font-weight:700; color:var(--muted); }
+.your-priorities-remaining{ font-size:13px; color:var(--orange-deep); font-weight:700; }
+
+/* ---------------- results / rankings sidebar ---------------- */
+.results-layout{ display:grid; grid-template-columns:230px 1fr; gap:22px; }
+@media(max-width:720px){ .results-layout{ grid-template-columns:1fr; } }
+.rankings-panel{ background:var(--panel); border:2.5px solid var(--line); border-radius:16px; padding:16px; box-shadow:4px 4px 0 var(--line); height:fit-content; }
+.rankings-title{ color:var(--orange-deep); font-weight:700; font-size:12.5px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.rank-slot{ border:2px solid #DCD2EC; border-radius:12px; padding:10px 12px; margin-bottom:8px; display:flex; align-items:center; gap:10px; min-height:18px; }
+.rank-slot-num{ width:22px; height:22px; border-radius:50%; border:2px solid var(--muted-2); color:var(--muted); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+.rank-slot.filled{ border-color:var(--orange); background:var(--orange-tint); }
+.rank-slot.filled .rank-slot-num{ border-color:var(--orange); color:var(--orange-deep); background:#fff; }
+.rank-slot-body{ display:flex; flex-direction:column; overflow:hidden; }
+.rank-slot-title{ font-weight:700; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rank-slot-points{ font-size:10.5px; color:var(--muted); font-weight:600; }
+.you-row{ margin-top:12px; padding-top:12px; border-top:2px dashed #DCD2EC; }
+.you-row-inner{ background:var(--orange); color:#FFFFFF; border:2px solid var(--line); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px; }
+.you-row-inner strong{ font-size:13px; }
+.you-row-inner span{ display:block; font-size:11px; font-weight:600; }
+
+.reveal-main{ background:var(--panel); border:2.5px solid var(--orange); border-radius:18px; padding:26px; box-shadow:5px 5px 0 var(--line); min-height:220px; display:flex; flex-direction:column; }
+.reveal-tag{ display:inline-block; border:2px solid var(--orange); color:var(--orange-deep); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; padding:4px 12px; border-radius:999px; margin-bottom:14px; align-self:flex-start; }
+.reveal-rank{ font-family:'Baloo 2',sans-serif; font-size:52px; font-weight:800; color:var(--orange); line-height:1; }
+.reveal-title{ font-size:clamp(22px,4vw,30px); font-weight:700; margin:10px 0 6px; }
+.reveal-points{ font-weight:700; color:var(--orange-deep); font-size:15px; margin-bottom:18px; }
+.reveal-empty{ color:var(--muted); font-size:15px; margin:auto 0; text-align:center; }
+.results-caption{ text-align:center; font-size:13px; color:var(--muted); margin-top:16px; font-weight:600; }
+.results-caption strong{ color:var(--orange-deep); }
+
+/* ---------------- final ---------------- */
+.final-headline{ font-size:clamp(28px,6vw,44px); line-height:1.08; margin-bottom:16px; font-weight:700; }
+
+/* ---------------- host frame ---------------- */
+.demo-switch{ position:fixed; top:14px; right:14px; z-index:20; background:var(--panel); border:2px solid var(--orange);
+  color:var(--orange-deep); font-weight:700; font-size:11px; padding:8px 14px; border-radius:999px; box-shadow:3px 3px 0 var(--line); }
+.host-frame{ max-width:1020px; margin:0 auto; padding:16px 20px 70px; position:relative; z-index:2; }
+.host-body{ display:grid; grid-template-columns:1fr; gap:0; }
+.host-stats-grid{ display:flex; gap:14px; margin-bottom:20px; flex-wrap:wrap; }
+.host-stat{ background:var(--panel); border:2.5px solid var(--line); border-radius:14px; padding:16px 22px; text-align:center; box-shadow:3px 3px 0 var(--line); }
+.host-stat strong{ display:block; font-family:'Baloo 2',sans-serif; font-size:26px; font-weight:700; }
+.host-stat span{ font-size:12px; color:var(--muted); font-weight:600; }
+.top-priority-card{ background:var(--orange-tint); border:2.5px solid var(--orange); border-radius:16px; padding:20px; margin-bottom:20px; box-shadow:4px 4px 0 var(--line); }
+.top-priority-card h3{ font-size:22px; margin:6px 0; }
+.top-priority-card p{ color:var(--orange-deep); font-size:13px; margin:0; font-weight:700; }
+
+/* ---------------- prototype-only preview tooling (deliberately NOT product chrome) ---------------- */
+.proto-wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 20px; position:relative; z-index:2; }
+.proto-panel{ max-width:560px; width:100%; background:repeating-linear-gradient(135deg,#EFEFEF,#EFEFEF 10px,#E6E6E6 10px,#E6E6E6 20px);
+  border:2px dashed #8A8A8A; border-radius:10px; padding:26px 26px 30px; font-family:'Courier New',monospace; color:#3A3A3A; }
+.proto-tag{ display:inline-block; background:#3A3A3A; color:#fff; font-size:10.5px; letter-spacing:0.08em; font-weight:700;
+  padding:4px 9px; border-radius:4px; margin-bottom:14px; }
+.proto-title{ font-family:'Courier New',monospace; font-size:16px; font-weight:700; margin-bottom:8px; color:#222; }
+.proto-copy{ font-size:12.5px; line-height:1.6; color:#555; margin-bottom:20px; }
+.proto-choices{ display:flex; gap:12px; flex-wrap:wrap; }
+.proto-btn{ flex:1; min-width:200px; background:#fff; border:2px dashed #8A8A8A; border-radius:8px; padding:16px; text-align:left;
+  font-family:'Courier New',monospace; color:#222; cursor:pointer; }
+.proto-btn:hover{ border-color:#3A3A3A; background:#FAFAFA; }
+.proto-btn b{ display:block; font-size:13px; margin-bottom:4px; }
+.proto-btn span{ font-size:11.5px; color:#666; line-height:1.4; display:block; }
+.proto-switch{ position:fixed; top:12px; right:12px; z-index:30; background:repeating-linear-gradient(135deg,#EFEFEF,#EFEFEF 6px,#E6E6E6 6px,#E6E6E6 12px);
+  border:2px dashed #8A8A8A; color:#3A3A3A; font-family:'Courier New',monospace; font-size:10.5px; padding:7px 12px; border-radius:6px; }
+.proto-switch:hover{ border-color:#3A3A3A; }
+.config-note{ font-size:12px; color:var(--muted); font-style:italic; margin-bottom:16px; }
+
+@media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="bg-texture" id="bgTexture" aria-hidden="true"></div>
+<div id="root"></div>
+
+<script>
+/* ============================================================
+   DATA
+   ============================================================ */
+const TOTAL_PEOPLE = 24;
+
+const AVATAR_ROWS = [
+  { bg: "green",       emojis: ["🦊","🐨","🐼"] },
+  { bg: "blue",         emojis: ["🦁","🐺","🐯"] },
+  { bg: "pink",         emojis: ["🐰","🦋","🐙"] },
+  { bg: "yellow",       emojis: ["🐸","🦉","🐝"] },
+  { bg: "coral",        emojis: ["🐳","🦔","🐢"] },
+  { bg: "greenLight",   emojis: ["🦩","🐧","🦝"] },
+];
+const AVATAR_OPTIONS = [];
+AVATAR_ROWS.forEach(row => row.emojis.forEach(e => AVATAR_OPTIONS.push({ emoji: e, bg: row.bg })));
+
+const CLUSTERS = [
+  { phrasings: ["More learning opportunities","A monthly learning day","Better access to online courses","More budget for professional development","Time set aside each week to learn something new","A mentorship program"] },
+  { phrasings: ["More team experiences","A team offsite every quarter","More casual team hangouts","Better team lunches","A team trip once a year"] },
+  { phrasings: ["Better collaboration tools","Fewer tools that do the same thing","A shared tool that actually works","One place to find documents instead of five"] },
+  { phrasings: ["Fewer unnecessary meetings","Shorter meetings","No-meeting Wednesdays","Meetings that start on time","Fewer status update meetings"] },
+  { phrasings: ["More flexibility in working hours","Working from anywhere one day a week","Flexible start times","More trust to manage my own schedule"] },
+  { phrasings: ["Flexible Fridays","Half-day Fridays once a month"] },
+  { phrasings: ["More recognition for good work","A simple way to say thanks to a teammate","Celebrating small wins more often"] },
+  { phrasings: ["Quiet space to focus","A proper quiet room","Fewer open-plan interruptions"] },
+  { phrasings: ["Better snacks in the kitchen","Coffee that actually tastes good","Healthier snack options"] },
+  { phrasings: ["A clearer path for promotion","More clarity on how growth works here","Regular feedback on how I'm doing"] },
+  { phrasings: ["A wellbeing day each quarter","More mental health support","Less pressure to be always online"] },
+  { phrasings: ["A dog-friendly office","Standing desks for everyone","A book club","More natural light in the office","A plant for every desk","Help with commuting costs","A smoother onboarding experience"] },
+];
+
+function seededRandom(seed){ let s = seed; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
+function hashNum(str){ let h = 0; for (let i=0;i<str.length;i++) h = (h*31 + str.charCodeAt(i)) >>> 0; return h; }
+function noteTilt(id){ const h = hashNum(String(id)); return { rot: ((h % 900)/100) - 4.5, y: (h % 13) - 6 }; }
+function plural(n, s="wish", p="wishes"){ return `${n} ${n === 1 ? s : p}`; }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function generateSeedSession(){
+  const rand = seededRandom(42);
+  const allPhrasings = [];
+  CLUSTERS.forEach(c => c.phrasings.forEach(p => allPhrasings.push(p)));
+  const participants = []; const wishes = []; let wid = 1;
+  for (let i=0;i<23;i++){
+    const opt = AVATAR_OPTIONS[Math.floor(rand()*AVATAR_OPTIONS.length)];
+    participants.push({ id:`p${i}`, emoji:opt.emoji, bg:opt.bg });
+    const count = 2 + Math.floor(rand()*3);
+    const used = new Set();
+    for (let j=0;j<count;j++){
+      let idx = Math.floor(rand()*allPhrasings.length); let tries=0;
+      while(used.has(idx) && tries<8){ idx = Math.floor(rand()*allPhrasings.length); tries++; }
+      used.add(idx);
+      wishes.push({ id:`w${wid++}`, text: allPhrasings[idx], emoji:opt.emoji, bg:opt.bg, matched:false });
+    }
+  }
+  return { participants, wishes };
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let ST = {
+  screen: "hostHome", // hostHome | avatar | entering | app
+  role: "host",
+  viewMode: "host",
+  session: null,
+  me: { emoji:null, bg:null, wishes: [], doneWishing:false, tokens:{}, doneAllocating:false, doneResults:false, recapSeen:false },
+  ui: { selectedMatchIds: [], naming: false, pulse: false, setupStep: "configure", sessionName: "Team Wishlist — Q1 Check-in" }
+};
+
+function freshSession(){
+  const seed = generateSeedSession();
+  return { phase:"SETUP", participants: seed.participants, wishes: [], seedWishes: seed.wishes, wishesRevealed:0,
+           collectiveWishes: [], simReady:0, simPriorityDone:0, revealIndex:-1, ranking:[] };
+}
+ST.session = freshSession();
+
+/* ============================================================
+   ICONS (inline, line style)
+   ============================================================ */
+const ICONS = {
+  bulb: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="42" height="42"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V17h5.2v-1.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z"/></svg>`,
+  chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="42" height="42"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="36" height="36"><path d="M12 3l2.6 5.9 6.4.6-4.8 4.3 1.4 6.2L12 16.9 6.4 20l1.4-6.2L3 9.5l6.4-.6L12 3Z"/></svg>`,
+  puzzle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="40" height="40"><path d="M9 4h4v2.2a1.8 1.8 0 1 0 0 3.6V12h4v4h-2.2a1.8 1.8 0 1 0 0 3.6V22H9v-4H6.8a1.8 1.8 0 1 0 0-3.6H9V12H4.8a1.8 1.8 0 1 1 0-3.6H9V4Z"/></svg>`,
+  target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="40" height="40"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.4"/><circle cx="12" cy="12" r="0.8"/></svg>`,
+  calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="40" height="40"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>`,
+  coffee: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="36" height="36"><path d="M5 9h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9Z"/><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 5.5c0-1 1-1 1-2M11.5 5.5c0-1 1-1 1-2"/></svg>`,
+  heart: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="36" height="36"><path d="M12 20s-7-4.4-9.3-8.8C1.2 8 2.7 4.8 6 4.3c2-.3 3.6.7 6 3 2.4-2.3 4-3.3 6-3 3.3.5 4.8 3.7 3.3 6.9C19 15.6 12 20 12 20Z"/></svg>`,
+  people: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="42" height="42"><circle cx="8.5" cy="8" r="2.6"/><circle cx="16" cy="9" r="2.2"/><path d="M3 19c.5-3 2.6-4.6 5.5-4.6S13.5 16 14 19M14 19c.4-2.3 2-3.6 4.3-3.6S22 17 22.4 19"/></svg>`,
+  plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="28" height="28"><path d="M12 5v14M5 12h14"/></svg>`,
+  medal: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="40" height="40"><circle cx="12" cy="15" r="5.5"/><path d="M9 10 6.5 3M15 10 17.5 3M6.5 3h3M17.5 3h-3"/></svg>`,
+};
+
+/* ============================================================
+   BACKGROUND TEXTURE
+   ============================================================ */
+function renderBgTexture(){
+  const items = [
+    { icon:"bulb", top:"6%", left:"6%" }, { icon:"chat", top:"5%", left:"84%" },
+    { icon:"star", top:"14%", left:"46%" }, { icon:"puzzle", top:"34%", left:"90%" },
+    { icon:"coffee", top:"30%", left:"4%" }, { icon:"target", top:"55%", left:"88%" },
+    { icon:"calendar", top:"70%", left:"6%" }, { icon:"heart", top:"46%", left:"3%" },
+    { icon:"people", top:"78%", left:"80%" }, { icon:"plus", top:"20%", left:"70%" },
+    { icon:"medal", top:"85%", left:"40%" }, { icon:"star", top:"60%", left:"20%" },
+  ];
+  const icons = items.map(it => `<div class="bg-icon" style="top:${it.top};left:${it.left}">${ICONS[it.icon]}</div>`).join("");
+  const swirl = `<div class="bg-swirl" style="top:48%;left:47%"></div>`;
+  return icons + swirl;
+}
+document.getElementById("bgTexture").innerHTML = renderBgTexture();
+
+/* ============================================================
+   SMALL COMPONENTS
+   ============================================================ */
+function avatarChip(emoji, bg, size){
+  return `<span class="avatar-chip ${size} bg-${bg}" aria-hidden="true">${emoji}</span>`;
+}
+function bracketFrame(eyebrow, title, inner){
+  return `<div class="bracket-frame">
+    <div class="bracket-tab"><span></span><span></span><span></span><span></span></div>
+    <div class="bracket-tab bottom"><span></span><span></span><span></span><span></span></div>
+    <div class="corner-dots tl"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="corner-dots tr"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="corner-dots bl"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="corner-dots br"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="bracket-eyebrow">${esc(eyebrow)}</div>
+    <div class="bracket-title">${title}</div>
+    ${inner}
+  </div>`;
+}
+function statBox(icon, label, value){
+  return `<div class="stat-box"><div class="stat-label">${ICONS[icon] ? `<span style="width:14px;height:14px;display:inline-flex">${ICONS[icon]}</span>` : ""}${esc(label)}</div><div class="stat-value">${esc(value)}</div></div>`;
+}
+function tokenDotsHTML(used, total){
+  total = total || 3;
+  let s = "";
+  for (let i=0;i<total;i++) s += `<span class="dot ${i<used?"dot-filled":""}"></span>`;
+  return `<span class="token-dots">${s}</span>`;
+}
+function wishNoteHTML(w, opts){
+  opts = opts || {};
+  const { rot, y } = noteTilt(w.id);
+  const selected = opts.selectedIds && opts.selectedIds.includes(w.id);
+  const cls = ["wish-note"];
+  if (selected) cls.push("wish-note-selected");
+  if (w.matched && !opts.keepMatchedVisible) cls.push("wish-note-muted");
+  const clickAttr = opts.selectable ? `onclick="matchToggle('${w.id}')" aria-pressed="${selected?'true':'false'}"` : "disabled";
+  return `<button type="button" class="${cls.join(' ')}" style="transform:rotate(${rot}deg) translateY(${y}px)" ${clickAttr}>
+    ${avatarChip(w.emoji, w.bg, "sm")}<div class="wish-note-text">${esc(w.text)}</div>
+  </button>`;
+}
+function ideaWallHTML(wishes, opts){
+  return `<div class="idea-wall">${wishes.map(w => wishNoteHTML(w, opts)).join("")}</div>`;
+}
+function collectiveCardHTML(c, wishes, opts){
+  opts = opts || {};
+  const originals = c.wishIds.map(id => wishes.find(w => w.id === id)).filter(Boolean);
+  const avatars = originals.slice(0,6).map(w => avatarChip(w.emoji, w.bg, "sm")).join("");
+  const used = (opts.myTokens && opts.myTokens[c.id]) || 0;
+  return `<div class="collective-card ${opts.rank===1?'top':''}">
+    ${opts.rank ? `<span class="rank-badge">#${opts.rank}</span>` : ""}
+    <h3 class="collective-title">${esc(c.title)}</h3>
+    <p class="collective-count">${plural(c.wishIds.length)}</p>
+    <div class="collective-avatars">${avatars}</div>
+    ${opts.points !== undefined ? `<p class="collective-points">${opts.points} priority points</p>` : ""}
+    ${opts.expandable ? `<button class="link-btn2" onclick="toggleExpand('${c.id}')">${ST.ui['exp_'+c.id] ? 'Hide wishes' : 'View wishes'}</button>` : ""}
+    ${opts.expandable && ST.ui['exp_'+c.id] ? `<ul class="original-wishes-list">${originals.map(o=>`<li>${esc(o.text)}</li>`).join("")}</ul>` : ""}
+    ${opts.showTokens ? `<div class="token-control">
+        ${tokenDotsHTML(used)}
+        <div class="token-buttons">
+          <button class="token-btn" onclick="removeToken('${c.id}')" ${used===0?"disabled":""} aria-label="Remove a priority from ${esc(c.title)}">&minus;</button>
+          <button class="token-btn token-btn-add" onclick="addToken('${c.id}')" ${!opts.interactive?"disabled":""} aria-label="Add a priority to ${esc(c.title)}">+</button>
+        </div>
+      </div>` : ""}
+  </div>`;
+}
+
+/* ============================================================
+   SCREENS — pre-app
+   ============================================================ */
+function protoSwitchHTML(){
+  // NOT a product element. Real hosts never see this — it exists only so this standalone
+  // prototype can be previewed as both the host and an invited employee in one session.
+  const viewingEmployee = ST.viewMode === "participant";
+  return `<button class="proto-switch" onclick="toggleView()">PROTOTYPE PREVIEW &middot; viewing as ${viewingEmployee ? "Employee" : "Host"} — switch</button>`;
+}
+function hostHomeScreen(){
+  // This is the Team Wishlist homepage — but now it's the host's screen only (opened from
+  // inside GummyGum). Employees never see it; they land straight in the lobby via their email link.
+  const words = [
+    {t:"Imagine", top:"12%", left:"8%"}, {t:"Share", top:"18%", left:"78%"},
+    {t:"Find common ground", top:"38%", left:"4%"}, {t:"Prioritise", top:"70%", left:"82%"},
+    {t:"What do we want?", top:"80%", left:"10%"}, {t:"What matters most?", top:"46%", left:"84%"},
+  ];
+  const scatter = words.map(w => `<div class="drift-word" style="top:${w.top};left:${w.left}">${esc(w.t)}</div>`).join("");
+  return `${protoSwitchHTML()}<div class="screen landing">
+    ${scatter}
+    <div class="landing-content">
+      <div class="eyebrow">Team Engagement &middot; GummyGum</div>
+      <h1 class="landing-title">Team<br/><span>Wishlist</span></h1>
+      <p class="landing-statement">If you could make one thing better at work, what would you wish for?</p>
+      <div class="landing-actions">
+        <button class="btn2 orange" onclick="ST.screen='app'; render();">Host a session</button>
+      </div>
+      <p class="landing-footnote">A facilitated activity — not a survey, not a suggestion box.</p>
+    </div>
+  </div>`;
+}
+
+function screenAvatar(){
+  const sel = ST.ui.pickedAvatar;
+  const grid = AVATAR_OPTIONS.map((o,i) => `<button class="avatar-cell bg-${o.bg} ${sel===i?'selected':''}" onclick="pickAvatarCell(${i})" aria-pressed="${sel===i}" aria-label="Choose avatar ${o.emoji}">${o.emoji}</button>`).join("");
+  return `${protoSwitchHTML()}<div class="screen center-screen">
+    <div class="eyebrow">Team Wishlist</div>
+    <h2 class="section-title">You're joining anonymously.</h2>
+    <p class="section-sub">No names. Just your wishes.</p>
+    <div class="avatar-grid2" role="group" aria-label="Choose your avatar">${grid}</div>
+    <div class="avatar-confirm-row">
+      ${sel!=null ? `<button class="btn2 orange" onclick="confirmAvatar()">Confirm selection</button><button class="link-btn2" onclick="ST.ui.pickedAvatar=null; render();">Cancel</button>` : `<p class="section-sub" style="margin:0">Pick one to continue.</p>`}
+    </div>
+  </div>`;
+}
+function screenEntering(){
+  return `${protoSwitchHTML()}<div class="screen center-screen">
+    <div class="loader-circle">${ST.me.emoji}</div>
+    <div class="loader-text">Saving your identity&hellip;</div>
+  </div>`;
+}
+
+/* ============================================================
+   PARTICIPANT SCREENS
+   ============================================================ */
+function participantWishing(){
+  const remaining = 5 - ST.me.wishes.length;
+  return `<div class="screen">
+    <header class="room-header"><div class="eyebrow" style="margin:0">Team Wishlist</div><span class="room-count">24 people in the room</span></header>
+    <h2 class="phase-title">Make your wishes</h2>
+    <p class="phase-prompt">What would you love to see, have, change or improve at work?</p>
+    <p class="phase-instruction">One idea per wish.</p>
+    <div class="wish-counter">${remaining>0 ? `You have ${plural(remaining)}` : "You've used all 5 wishes"}</div>
+    <div class="wish-input-row">
+      <textarea id="wishInput" class="wish-input" placeholder="Write your wish&hellip;" maxlength="90" ${remaining<=0?"disabled":""} aria-label="Write your wish"></textarea>
+      <button class="btn2 orange" onclick="submitWish()" ${remaining<=0?"disabled":""}>Add wish</button>
+    </div>
+    ${ST.ui.pulse ? `<div class="wish-ack" role="status">Your wish is in. One more voice in the room.</div>` : ""}
+    <div class="your-wishes" aria-label="Your wishes so far">
+      ${ST.me.wishes.map(w => `<div class="your-wish-row"><span class="check">&#10003;</span> ${esc(w)}</div>`).join("")}
+    </div>
+    <div class="wishing-footer"><button class="btn2 ghost full" onclick="finishWishing()" ${ST.me.wishes.length===0?"disabled":""}>I'm done</button></div>
+  </div>`;
+}
+function waitingScreen(ready, headline, sub){
+  const avs = ST.session.participants.slice(0,6);
+  return `<div class="screen center-screen">
+    <div class="waiting-orbit" aria-hidden="true">${avs.map(a=>`<span class="orbit-avatar">${avatarChip(a.emoji,a.bg,"sm")}</span>`).join("")}</div>
+    <h2 class="section-title">${esc(headline)}</h2>
+    <p class="section-sub">${esc(sub)}</p>
+    <div class="ready-count">${ready} / ${TOTAL_PEOPLE} people ready</div>
+    <div class="ready-bar"><div class="ready-bar-fill" style="width:${(ready/TOTAL_PEOPLE)*100}%"></div></div>
+  </div>`;
+}
+function participantReveal(){
+  return `<div class="screen">
+    <header class="room-header"><div class="eyebrow" style="margin:0">Team Wishlist</div><span class="phase-badge">Wish pool revealed</span></header>
+    <h2 class="phase-title">Look what we're wishing for</h2>
+    <p class="phase-prompt">Everyone brought something to the room.</p>
+    ${ideaWallHTML(ST.session.wishes, { selectable:false })}
+  </div>`;
+}
+function participantMatching(){
+  const unmatched = ST.session.wishes.filter(w=>!w.matched);
+  const strip = ST.session.collectiveWishes.length ? `<div class="collective-strip">${ST.session.collectiveWishes.map(c=>`<div class="mini-collective"><strong>${esc(c.title)}</strong><span>${plural(c.wishIds.length)}</span></div>`).join("")}</div>` : "";
+  return `<div class="screen">
+    <header class="room-header"><div class="eyebrow" style="margin:0">Team Wishlist</div><span class="phase-badge">Finding common ground</span></header>
+    <h2 class="phase-title">Find the common ground</h2>
+    <p class="phase-prompt">Some wishes may be asking for the same thing. Your host is bringing them together.</p>
+    ${strip}
+    <p class="wall-caption">${unmatched.length} wishes still in the pool</p>
+    ${ideaWallHTML(unmatched, { selectable:false })}
+  </div>`;
+}
+function collectiveWishlistRecap(withContinue){
+  return `<div class="screen">
+    <h2 class="phase-title">Our wishlist</h2>
+    <p class="phase-prompt">We found some common ground.</p>
+    <div class="collective-grid">${ST.session.collectiveWishes.map(c=>collectiveCardHTML(c, ST.session.wishes, { expandable:true })).join("")}</div>
+    ${withContinue ? `<div class="wishing-footer"><button class="btn2 orange full" onclick="ST.me.recapSeen=true; render();">What matters most? &rarr;</button></div>` : ""}
+  </div>`;
+}
+function prioritisationScreen(){
+  const total = Object.values(ST.me.tokens).reduce((a,b)=>a+b,0);
+  const remaining = 3 - total;
+  return `<div class="screen">
+    <h2 class="phase-title">Now, what matters most?</h2>
+    <p class="phase-prompt">You can't choose everything.</p>
+    <p class="phase-instruction">You have 3 priorities.</p>
+    <div class="your-priorities">
+      <span class="your-priorities-label">Your priorities</span>${tokenDotsHTML(total)}
+      <span class="your-priorities-remaining">${remaining>0 ? remaining+" left" : "You've used all 3 priorities"}</span>
+    </div>
+    <div class="collective-grid">${ST.session.collectiveWishes.map(c=>collectiveCardHTML(c, ST.session.wishes, { expandable:true, showTokens:true, interactive: remaining>0, myTokens: ST.me.tokens })).join("")}</div>
+    <div class="wishing-footer"><button class="btn2 orange full" onclick="finishAllocating()" ${total===0?"disabled":""}>I'm done</button></div>
+  </div>`;
+}
+function participantPrioritisationFlow(){
+  if (ST.me.doneAllocating){
+    return `<div class="screen center-screen">
+      <h2 class="section-title">Your priorities are in.</h2>
+      <p class="section-sub">You've helped decide what matters most.</p>
+      <div class="ready-count">${ST.session.simPriorityDone + 1} / ${TOTAL_PEOPLE} participants complete</div>
+    </div>`;
+  }
+  if (!ST.me.recapSeen) return collectiveWishlistRecap(true);
+  return prioritisationScreen();
+}
+function rankingsSidebarHTML(){
+  const n = ST.session.ranking.length;
+  const shown = ST.session.revealIndex + 1;
+  const slots = [];
+  for (let rank=1; rank<=n; rank++){
+    const c = ST.session.ranking[rank-1];
+    const revealedCount = shown; // how many revealed from bottom
+    const isFilled = (n - rank) < revealedCount;
+    slots.push(`<div class="rank-slot ${isFilled?'filled':''}">
+      <span class="rank-slot-num">${rank}</span>
+      <div class="rank-slot-body">
+        <span class="rank-slot-title">${isFilled ? esc(c.title) : ""}</span>
+        ${isFilled ? `<span class="rank-slot-points">${c.points} pts</span>` : ""}
+      </div>
+    </div>`);
+  }
+  const myTop = Object.entries(ST.me.tokens).sort((a,b)=>b[1]-a[1])[0];
+  const myTopWish = myTop ? ST.session.collectiveWishes.find(c=>c.id===myTop[0]) : null;
+  return `<div class="rankings-panel">
+    <div class="rankings-title">${ICONS.medal.replace('width="40" height="40"','width="16" height="16"')} Live rankings</div>
+    ${slots.join("")}
+    <div class="you-row"><div class="you-row-inner">
+      ${avatarChip(ST.me.emoji, ST.me.bg, "sm")}
+      <div><strong>You</strong><span>${myTopWish ? myTopWish.title : "3 priorities used"}</span></div>
+    </div></div>
+  </div>`;
+}
+function resultsRevealMain(){
+  const idx = ST.session.revealIndex;
+  const n = ST.session.ranking.length;
+  if (idx < 0){
+    return `<div class="reveal-main"><p class="reveal-empty">Waiting for the host to reveal the results&hellip;</p></div>`;
+  }
+  const rank = n - idx; // current item's rank (n - idx since revealing from bottom)
+  const c = ST.session.ranking[rank-1];
+  return `<div class="reveal-main">
+    <span class="reveal-tag">Rank</span>
+    <div class="reveal-rank">#${rank}</div>
+    <h3 class="reveal-title">${esc(c.title)}</h3>
+    <div class="reveal-points">${c.points} priority points</div>
+  </div>`;
+}
+function participantResults(){
+  const done = ST.session.revealIndex >= ST.session.ranking.length - 1;
+  return `<div class="screen">
+    <h2 class="phase-title">This is what we want</h2>
+    <div class="results-layout">
+      ${rankingsSidebarHTML()}
+      ${resultsRevealMain()}
+    </div>
+    <p class="results-caption">${ST.session.revealIndex+1} of ${ST.session.ranking.length} revealed</p>
+    ${done ? `<div class="wishing-footer"><button class="btn2 orange full" onclick="ST.me.doneResults=true; render();">Continue</button></div>` : ""}
+  </div>`;
+}
+function participantFinal(){
+  const list = ST.session.ranking.length ? ST.session.ranking : ST.session.collectiveWishes;
+  return `<div class="screen center-screen">
+    <div class="eyebrow">Session complete</div>
+    <h2 class="final-headline">From our wishes<br/>to our priorities.</h2>
+    <p class="section-sub">You told us what you want.<br/>You found what you have in common.<br/>You decided what matters most.</p>
+    <div class="collective-grid collective-grid-compact">${list.slice(0,6).map(c=>`<div class="final-chip">${esc(c.title)}</div>`).join("")}</div>
+  </div>`;
+}
+
+/* ============================================================
+   HOST SCREENS
+   ============================================================ */
+function hostControlsHTML(){
+  const map = {
+    SETUP: {label:"Launch session", next:"WISHING"},
+    WISHING: {label:"Close wishes", next:"WAITING"},
+    WAITING: {label:"Reveal wishes", next:"REVEAL"},
+    REVEAL: {label:"Start matching", next:"MATCHING"},
+    MATCHING: {label:"Start prioritisation", next:"PRIORITISATION"},
+    PRIORITISATION: {label:"Reveal results", next:"RESULTS"},
+  };
+  const cfg = map[ST.session.phase];
+  if (!cfg) return "";
+  return `<button class="btn2 orange" onclick="advancePhase('${cfg.next}')">${cfg.label}</button>`;
+}
+function hostHeaderHTML(){
+  const labels = { SETUP:"Configuring session", WISHING:"Making wishes", WAITING:"Wishes closed", REVEAL:"Wish pool revealed",
+    MATCHING:"Finding common ground", PRIORITISATION:"Prioritising", RESULTS:"Results", COMPLETE:"Complete" };
+  const inRoom = ST.session.phase === "SETUP" ? 0 : TOTAL_PEOPLE;
+  const inner = `<div class="stat-row">
+    ${statBox('people','In room', inRoom)}
+    ${statBox('star','Ready', ST.session.simReady)}
+    ${statBox('bulb','Wishes', ST.session.wishes.length)}
+    ${statBox('puzzle','Collective', ST.session.collectiveWishes.length)}
+  </div>`;
+  return bracketFrame("Team Wishlist", `${esc(ST.ui.sessionName)} <span class="dot">&bull;</span> ${esc(labels[ST.session.phase]||ST.session.phase)}`, inner);
+}
+function hostMatchingHTML(){
+  const unmatched = ST.session.wishes.filter(w=>!w.matched);
+  const sel = ST.ui.selectedMatchIds;
+  let bar = "";
+  if (sel.length > 0 && !ST.ui.naming){
+    bar = `<div class="match-bar">
+      <span>${plural(sel.length)} selected</span>
+      <span class="match-bar-question">Do these belong together?</span>
+      <div class="match-bar-actions">
+        <button class="btn2 ghost" onclick="matchClear()">Keep separate</button>
+        <button class="btn2 orange" onclick="matchStartNaming()" ${sel.length<2?"disabled":""}>Match</button>
+      </div>
+    </div>`;
+  }
+  let naming = "";
+  if (ST.ui.naming){
+    const quotes = sel.map(id => { const w = ST.session.wishes.find(x=>x.id===id); return `<div class="naming-quote">"${esc(w?.text||"")}"</div>`; }).join("");
+    naming = `<div class="naming-panel">
+      <p class="naming-lead">${plural(sel.length)} independently wished for something like this.</p>
+      <div class="naming-quotes">${quotes}</div>
+      <input id="namingInput" class="naming-input" placeholder="Name this collective wish&hellip;" aria-label="Collective wish title" />
+      <div class="naming-actions">
+        <button class="btn2 ghost" onclick="matchClear()">Cancel</button>
+        <button class="btn2 orange" onclick="matchSave()">Save collective wish</button>
+      </div>
+    </div>`;
+  }
+  const strip = ST.session.collectiveWishes.length ? `<div class="collective-strip">${ST.session.collectiveWishes.map(c=>`<div class="mini-collective"><strong>${esc(c.title)}</strong><span>${plural(c.wishIds.length)}</span></div>`).join("")}</div>` : "";
+  return `<div class="screen" style="padding:0;max-width:none">
+    <h2 class="phase-title">Find the common ground</h2>
+    <p class="phase-prompt">Some wishes may be asking for the same thing. Let's bring them together.</p>
+    <p class="wall-caption">${ST.session.collectiveWishes.length} collective ${ST.session.collectiveWishes.length===1?"wish":"wishes"} created &middot; ${unmatched.length} wishes remaining</p>
+    ${ideaWallHTML(unmatched, { selectable:true, selectedIds:sel })}
+    ${bar}${naming}${strip}
+  </div>`;
+}
+function hostMain(){
+  const s = ST.session;
+  if (s.phase === "SETUP"){
+    if (ST.ui.setupStep === "configure"){
+      return `<div class="screen" style="padding:0;max-width:none">
+        <p class="config-note">Stand-in for GummyGum's own session configuration screen — participants, schedule and reminders are set up here in the real product.</p>
+        <h2 class="phase-title">Set up your session</h2>
+        <p class="phase-prompt">Give it a name and check the experience's settings before you launch.</p>
+        <div style="margin:22px 0 20px">
+          <label style="display:block;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">Session name</label>
+          <input id="sessionNameInput" class="wish-input" style="min-height:auto;padding:13px 15px" value="${esc(ST.ui.sessionName)}" />
+        </div>
+        <div class="host-stats-grid">
+          <div class="host-stat"><strong>24</strong><span>invited &middot; from GummyGum</span></div>
+          <div class="host-stat"><strong>5</strong><span>wishes per person</span></div>
+          <div class="host-stat"><strong>3</strong><span>priority tokens each</span></div>
+        </div>
+        <div class="wishing-footer"><button class="btn2 orange" onclick="setupContinue()">Continue</button></div>
+      </div>`;
+    }
+    return `<div class="screen" style="padding:0;max-width:none">
+      <p class="config-note">Stand-in for GummyGum's own session configuration screen — participants, schedule and reminders are set up here in the real product.</p>
+      <button class="link-btn2" style="margin-bottom:16px" onclick="ST.ui.setupStep='configure'; render();">&larr; Back to setup</button>
+      <h2 class="phase-title">Ready to launch</h2>
+      <p class="phase-prompt">&ldquo;${esc(ST.ui.sessionName)}&rdquo; &mdash; 24 people will be invited by email the moment you launch.</p>
+      <div class="wishing-footer">${hostControlsHTML()}</div>
+    </div>`;
+  }
+  if (s.phase === "WISHING"){
+    return `<div class="screen" style="padding:0;max-width:none">
+      <h2 class="phase-title">Wishes are open</h2>
+      <p class="phase-prompt">${s.wishes.length} wishes submitted so far.</p>
+      ${ideaWallHTML(s.wishes.slice(-24), { selectable:false })}
+      <div class="wishing-footer">${hostControlsHTML()}</div>
+    </div>`;
+  }
+  if (s.phase === "WAITING"){
+    const ready = s.simReady;
+    return `<div class="screen" style="padding:0;max-width:none">
+      <h2 class="phase-title">Wishes closed</h2>
+      <p class="phase-prompt">${ready} / ${TOTAL_PEOPLE} people ready. ${s.wishes.length} wishes collected.</p>
+      <div class="wishing-footer">${hostControlsHTML()}</div>
+    </div>`;
+  }
+  if (s.phase === "REVEAL"){
+    return `<div class="screen" style="padding:0;max-width:none">
+      <h2 class="phase-title">Look what we're wishing for</h2>
+      <p class="phase-prompt">Everyone brought something to the room.</p>
+      ${ideaWallHTML(s.wishes, { selectable:false })}
+      <div class="wishing-footer">${hostControlsHTML()}</div>
+    </div>`;
+  }
+  if (s.phase === "MATCHING"){
+    return hostMatchingHTML() + `<div class="wishing-footer">${hostControlsHTML()}</div>`;
+  }
+  if (s.phase === "PRIORITISATION"){
+    return `<div class="screen" style="padding:0;max-width:none">
+      <h2 class="phase-title">Team is prioritising</h2>
+      <p class="phase-prompt">${s.simPriorityDone} / ${TOTAL_PEOPLE} participants complete.</p>
+      <div class="collective-grid">${s.collectiveWishes.map(c=>collectiveCardHTML(c, s.wishes, { expandable:true })).join("")}</div>
+      <div class="wishing-footer">${hostControlsHTML()}</div>
+    </div>`;
+  }
+  if (s.phase === "RESULTS"){
+    const done = s.revealIndex >= s.ranking.length - 1;
+    return `<div class="screen" style="padding:0;max-width:none">
+      <h2 class="phase-title">This is what we want</h2>
+      <div class="results-layout">${rankingsSidebarHostHTML()}${resultsRevealMain()}</div>
+      <p class="results-caption">${s.revealIndex+1} of ${s.ranking.length} revealed</p>
+      <div class="wishing-footer">${done ? `<button class="btn2 orange full" onclick="advancePhase('COMPLETE')">End session</button>` : `<button class="btn2 orange full" onclick="revealNext()">Reveal next</button>`}</div>
+    </div>`;
+  }
+  if (s.phase === "COMPLETE"){
+    return hostResultsHTML();
+  }
+  return "";
+}
+function rankingsSidebarHostHTML(){
+  // same as participant sidebar but without a "you" personal row (host perspective)
+  const n = ST.session.ranking.length;
+  const shown = ST.session.revealIndex + 1;
+  const slots = [];
+  for (let rank=1; rank<=n; rank++){
+    const c = ST.session.ranking[rank-1];
+    const isFilled = (n - rank) < shown;
+    slots.push(`<div class="rank-slot ${isFilled?'filled':''}">
+      <span class="rank-slot-num">${rank}</span>
+      <div class="rank-slot-body">
+        <span class="rank-slot-title">${isFilled ? esc(c.title) : ""}</span>
+        ${isFilled ? `<span class="rank-slot-points">${c.points} pts</span>` : ""}
+      </div>
+    </div>`);
+  }
+  return `<div class="rankings-panel"><div class="rankings-title">${ICONS.medal.replace('width="40" height="40"','width="16" height="16"')} Live rankings</div>${slots.join("")}</div>`;
+}
+function hostResultsHTML(){
+  const s = ST.session;
+  const top = s.ranking[0];
+  return `<div class="screen" style="padding:0;max-width:none">
+    <h2 class="phase-title">Session results</h2>
+    <div class="host-stats-grid">
+      <div class="host-stat"><strong>24</strong><span>participants</span></div>
+      <div class="host-stat"><strong>${s.wishes.length}</strong><span>individual wishes</span></div>
+      <div class="host-stat"><strong>${s.collectiveWishes.length}</strong><span>collective wishes</span></div>
+    </div>
+    ${top ? `<div class="top-priority-card"><span class="eyebrow" style="margin-bottom:2px">Top priority</span><h3>${esc(top.title)}</h3><p>${top.points} priority points</p></div>` : ""}
+    <div class="collective-grid">${s.ranking.map((c,i)=>collectiveCardHTML(c, s.wishes, { rank:i+1, points:c.points, expandable:true })).join("")}</div>
+    <div class="wishing-footer"><button class="btn2 ghost full" onclick="restartDemo()">Start a new demo</button></div>
+  </div>`;
+}
+
+/* ============================================================
+   ROOT RENDER
+   ============================================================ */
+function render(){
+  let html = "";
+  if (ST.screen === "hostHome"){
+    html = hostHomeScreen();
+  } else if (ST.screen === "avatar"){
+    html = screenAvatar();
+  } else if (ST.screen === "entering"){
+    html = screenEntering();
+  } else if (ST.screen === "app"){
+    const switchBtn = protoSwitchHTML();
+    if (ST.viewMode === "host"){
+      html = `${switchBtn}<div class="host-frame">${hostHeaderHTML()}${hostMain()}</div>`;
+    } else {
+      const s = ST.session;
+      const readyTotal = s.simReady + (ST.me.doneWishing?1:0);
+      let body = "";
+      if (s.phase === "SETUP"){
+        body = `<div class="screen center-screen">
+          <div class="waiting-orbit" aria-hidden="true">${s.participants.slice(0,6).map(a=>`<span class="orbit-avatar">${avatarChip(a.emoji,a.bg,"sm")}</span>`).join("")}</div>
+          <h2 class="section-title">Getting ready&hellip;</h2><p class="section-sub">Your host will open wishes shortly.</p>
+        </div>`;
+      } else if (s.phase === "WISHING"){
+        body = ST.me.doneWishing ? waitingScreen(readyTotal, "Your wishes are in.", "We're waiting for the room.") : participantWishing();
+      } else if (s.phase === "WAITING"){
+        body = ST.me.doneWishing ? waitingScreen(readyTotal, "Your wishes are in.", "We're waiting for the room.") : participantWishing();
+      } else if (s.phase === "REVEAL"){
+        body = participantReveal();
+      } else if (s.phase === "MATCHING"){
+        body = participantMatching();
+      } else if (s.phase === "PRIORITISATION"){
+        body = participantPrioritisationFlow();
+      } else if (s.phase === "RESULTS"){
+        body = ST.me.doneResults ? participantFinal() : participantResults();
+      } else if (s.phase === "COMPLETE"){
+        body = participantFinal();
+      }
+      html = `${switchBtn}${body}`;
+    }
+  }
+  document.getElementById("root").innerHTML = html;
+}
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+function pickAvatarCell(i){ ST.ui.pickedAvatar = i; render(); }
+function setupContinue(){
+  const el = document.getElementById("sessionNameInput");
+  ST.ui.sessionName = (el && el.value.trim()) || ST.ui.sessionName;
+  ST.ui.setupStep = "review";
+  render();
+}function confirmAvatar(){
+  const o = AVATAR_OPTIONS[ST.ui.pickedAvatar];
+  ST.me.emoji = o.emoji; ST.me.bg = o.bg;
+  ST.screen = "entering"; render();
+  setTimeout(() => { ST.viewMode = "participant"; ST.screen = "app"; render(); }, 900);
+}
+function submitWish(){
+  const el = document.getElementById("wishInput");
+  const text = (el.value || "").trim();
+  if (!text || ST.me.wishes.length >= 5) return;
+  ST.me.wishes.push(text);
+  ST.ui.pulse = true;
+  render();
+  setTimeout(() => { ST.ui.pulse = false; render(); }, 1400);
+}
+function finishWishing(){
+  ST.me.doneWishing = true;
+  const newWishes = ST.me.wishes.map((t,i) => ({ id:`you-${i}-${Date.now()}`, text:t, emoji:ST.me.emoji, bg:ST.me.bg, matched:false }));
+  ST.session.wishes = ST.session.wishes.concat(newWishes);
+  render();
+}
+function toggleExpand(cid){ ST.ui['exp_'+cid] = !ST.ui['exp_'+cid]; render(); }
+function addToken(cid){
+  const total = Object.values(ST.me.tokens).reduce((a,b)=>a+b,0);
+  if (total >= 3) return;
+  ST.me.tokens[cid] = (ST.me.tokens[cid]||0) + 1;
+  render();
+}
+function removeToken(cid){
+  const cur = ST.me.tokens[cid] || 0;
+  if (cur === 0) return;
+  ST.me.tokens[cid] = cur - 1;
+  render();
+}
+function finishAllocating(){ ST.me.doneAllocating = true; render(); }
+
+function matchToggle(id){
+  const i = ST.ui.selectedMatchIds.indexOf(id);
+  if (i >= 0) ST.ui.selectedMatchIds.splice(i,1); else ST.ui.selectedMatchIds.push(id);
+  render();
+}
+function matchClear(){ ST.ui.selectedMatchIds = []; ST.ui.naming = false; render(); }
+function matchStartNaming(){ ST.ui.naming = true; render(); }
+function matchSave(){
+  const input = document.getElementById("namingInput");
+  const title = (input.value || "").trim();
+  if (!title || ST.ui.selectedMatchIds.length === 0) return;
+  const id = `cw-${Date.now()}`;
+  const ids = ST.ui.selectedMatchIds.slice();
+  ST.session.wishes = ST.session.wishes.map(w => ids.includes(w.id) ? Object.assign({}, w, { matched:true }) : w);
+  ST.session.collectiveWishes.push({ id, title, wishIds: ids });
+  ST.ui.selectedMatchIds = []; ST.ui.naming = false;
+  render();
+}
+
+function advancePhase(next){
+  const s = ST.session;
+  if (next === "WAITING" || next === "REVEAL"){
+    if (s.wishesRevealed < s.seedWishes.length){
+      s.wishes = s.wishes.concat(s.seedWishes.slice(s.wishesRevealed));
+      s.wishesRevealed = s.seedWishes.length;
+    }
+  }
+  if (next === "PRIORITISATION"){
+    const leftovers = s.wishes.filter(w => !w.matched);
+    const promoted = leftovers.map(w => ({ id:`cw-single-${w.id}`, title:w.text, wishIds:[w.id] }));
+    s.wishes = s.wishes.map(w => w.matched ? w : Object.assign({}, w, { matched:true }));
+    s.collectiveWishes = s.collectiveWishes.concat(promoted);
+  }
+  if (next === "RESULTS"){
+    const rand = seededRandom(7);
+    const otherPoints = {};
+    s.collectiveWishes.forEach(c => { const weight = 1 + c.wishIds.length*1.4; otherPoints[c.id] = Math.round(weight*(6+rand()*6)); });
+    const myPoints = {};
+    Object.entries(ST.me.tokens).forEach(([id,n]) => { myPoints[id] = n*7; });
+    s.ranking = s.collectiveWishes.map(c => Object.assign({}, c, { points: (otherPoints[c.id]||0) + (myPoints[c.id]||0) })).sort((a,b)=>b.points-a.points);
+    s.revealIndex = -1;
+  }
+  s.phase = next;
+  render();
+}
+function revealNext(){
+  ST.session.revealIndex = Math.min(ST.session.revealIndex + 1, ST.session.ranking.length - 1);
+  render();
+}
+function toggleView(){
+  // Prototype-only: hops between the host side and the employee side. Switching to the
+  // employee drops you at their real entry point (the lobby/avatar step, or wherever they
+  // are if they've already joined) — never a homepage. Switching to host returns to their
+  // control room (or their home if they hadn't opened the experience yet).
+  if (ST.viewMode === "host"){
+    ST.role = "participant"; ST.viewMode = "participant";
+    ST.screen = ST.me.emoji ? "app" : "avatar";
+  } else {
+    ST.role = "host"; ST.viewMode = "host";
+    ST.screen = "app";
+  }
+  render();
+}
+function restartDemo(){
+  ST.session = freshSession();
+  ST.me = { emoji:null, bg:null, wishes: [], doneWishing:false, tokens:{}, doneAllocating:false, doneResults:false, recapSeen:false };
+  ST.ui = { selectedMatchIds: [], naming:false, pulse:false, setupStep:"configure", sessionName:"Team Wishlist — Q1 Check-in" };
+  ST.screen = "hostHome"; ST.role = "host"; ST.viewMode = "host";
+  render();
+}
+
+/* ============================================================
+   TICKER — simulate room activity
+   ============================================================ */
+setInterval(() => {
+  const s = ST.session;
+  let changed = false;
+  if (s.phase === "WISHING" || s.phase === "WAITING"){
+    if (s.simReady < 23){ s.simReady = Math.min(23, s.simReady + Math.ceil(Math.random()*3)); changed = true; }
+    if (s.wishesRevealed < s.seedWishes.length){
+      const take = Math.min(2 + Math.floor(Math.random()*3), s.seedWishes.length - s.wishesRevealed);
+      s.wishes = s.wishes.concat(s.seedWishes.slice(s.wishesRevealed, s.wishesRevealed + take));
+      s.wishesRevealed += take;
+      changed = true;
+    }
+  }
+  if (s.phase === "PRIORITISATION"){
+    if (s.simPriorityDone < 23){ s.simPriorityDone = Math.min(23, s.simPriorityDone + Math.ceil(Math.random()*2)); changed = true; }
+  }
+  if (changed && ST.screen === "app") render();
+}, 700);
+
+render();
+</script>
+</body>
+</html>
