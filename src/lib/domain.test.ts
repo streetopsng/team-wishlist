@@ -10,6 +10,7 @@ import {
   canSubmitWish,
   computeRanking,
   isForwardTransition,
+  isRevealComplete,
   isRoomFull,
   isValidWishText,
   revealOrder,
@@ -126,6 +127,16 @@ describe('scoring (ADR 0009)', () => {
     expect(ranking[0].collective.id).toBe('early')
   })
 
+  it('is fully deterministic: identical points AND createdAt fall back to id', () => {
+    const cs = [collective('zzz', 10), collective('aaa', 10)]
+    const ps1 = [participantWith({ zzz: 2, aaa: 2 })]
+    const ps2 = [participantWith({ aaa: 2, zzz: 2 })]
+    const r1 = computeRanking(cs, ps1).map((r) => r.collective.id)
+    const r2 = computeRanking(cs, ps2).map((r) => r.collective.id)
+    expect(r1).toEqual(r2)
+    expect(r1).toEqual(['aaa', 'zzz'])
+  })
+
   it('ignores tokens pointing at unknown collectives', () => {
     const cs = [collective('cw1', 1)]
     const ranking = computeRanking(cs, [participantWith({ cw1: 1, ghost: 5 })])
@@ -144,6 +155,27 @@ describe('scoring (ADR 0009)', () => {
     const ranking = computeRanking(cs, [participantWith({ cw1: 3, cw2: 2 })])
     const order = revealOrder(ranking).map((r) => r.collective.id)
     expect(order).toEqual(['cw3', 'cw2', 'cw1'])
+  })
+})
+
+describe('reveal completion semantics (ADR 0009: the #1 beat must be watchable)', () => {
+  it('distinguishes host-finished reveal from participant acknowledgement', () => {
+    // The host's cursor reaching the top is NOT the participant being done.
+    const rankingLen = 3
+    const revealIndex = rankingLen - 1 // host revealed #1
+    const participantDone = false
+    expect(isRevealComplete(revealIndex, rankingLen)).toBe(true)
+    expect(isRevealComplete(revealIndex, rankingLen) && participantDone).toBe(false)
+  })
+
+  it('treats pre-reveal cursors as incomplete', () => {
+    expect(isRevealComplete(-1, 3)).toBe(false)
+    expect(isRevealComplete(0, 3)).toBe(false)
+    expect(isRevealComplete(1, 3)).toBe(false)
+  })
+
+  it('handles empty rankings without crashing', () => {
+    expect(isRevealComplete(-1, 0)).toBe(false)
   })
 })
 

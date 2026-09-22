@@ -11,6 +11,7 @@ import {
   type CollectiveWish,
   type Participant,
   type Wish,
+  isRevealComplete,
 } from '@/lib/domain'
 import { markDone, setTokens, submitWish } from '@/lib/session'
 import type { SessionSnapshot } from '@/lib/session'
@@ -67,15 +68,12 @@ export function ParticipantRoom({
 
       {(phase === 'WISHING' || phase === 'WAITING') && (
         <ParticipantWishing
-          key={phase}
           code={code}
           me={me}
           myWishes={myWishes}
           participantCount={participants.length}
           doneCount={doneCount}
           closed={phase === 'WAITING'}
-          snapshotWishes={wishes}
-          collectives={collectives}
         />
       )}
 
@@ -128,10 +126,9 @@ export function ParticipantRoom({
       {phase === 'PRIORITISATION' && (
         <ParticipantPrioritisation code={code} me={me} collectives={collectives} wishes={wishes} participants={participants} />
       )}
-      {/* RecapGate and prioritisation receive the fully-typed wish list */}
 
       {phase === 'RESULTS' && (
-        <ParticipantResults snapshot={snapshot} me={me} collectives={collectives} participants={participants} />
+        <ParticipantResults code={code} snapshot={snapshot} me={me} collectives={collectives} participants={participants} />
       )}
 
       {phase === 'COMPLETE' && (
@@ -155,8 +152,6 @@ function ParticipantWishing({
   participantCount: number
   doneCount: number
   closed: boolean
-  snapshotWishes: unknown[]
-  collectives: CollectiveWish[]
 }) {
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -347,11 +342,13 @@ function RecapGate({
 }
 
 function ParticipantResults({
+  code,
   snapshot,
   me,
   collectives,
   participants,
 }: {
+  code: string
   snapshot: SessionSnapshot
   me: Participant
   collectives: CollectiveWish[]
@@ -360,9 +357,11 @@ function ParticipantResults({
   const ranking = useMemo(() => computeRanking(collectives, participants), [collectives, participants])
   const idx = snapshot.revealIndex
   const n = ranking.length
-  const done = idx >= n - 1
+  const revealComplete = isRevealComplete(idx, n)
 
-  if (me.doneResults || done) {
+  // The finale is shown only after THIS participant acknowledges the full reveal
+  // (ADR 0009): everyone watches #1 land, then continues on their own beat.
+  if (me.doneResults) {
     return <ParticipantFinal collectives={collectives} participants={participants} />
   }
 
@@ -413,6 +412,13 @@ function ParticipantResults({
       <p className="results-caption">
         {shown} of {n} revealed
       </p>
+      {revealComplete && (
+        <div className="wishing-footer">
+          <button type="button" className="btn2 orange full" onClick={() => markDone(code, me, 'doneResults')}>
+            See our wishlist
+          </button>
+        </div>
+      )}
     </div>
   )
 }

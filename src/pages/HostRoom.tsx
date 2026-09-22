@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react'
 import { BracketFrame, CollectiveCard, IdeaWall, StatBox } from '@/components/ui'
 import {
   NEXT_PHASE,
+  autoPromote,
   computeRanking,
   type CollectiveWish,
   type Participant,
   type Phase,
   type Wish,
 } from '@/lib/domain'
-import { saveCollective, setPhase, setRevealIndex } from '@/lib/session'
+import { applyAutoPromotion, saveCollective, setPhase, setRevealIndex } from '@/lib/session'
 import type { SessionSnapshot } from '@/lib/session'
 
 export function HostRoom({
@@ -26,6 +27,17 @@ export function HostRoom({
   const collectives = snapshot.collectives
   const doneWishing = participants.filter((p) => p.doneWishing).length
   const doneAllocating = participants.filter((p) => p.doneAllocating).length
+
+  async function advance(next: Phase): Promise<void> {
+    if (phase === 'MATCHING' && next === 'PRIORITISATION') {
+      const ungrouped = wishes.filter((w) => w.collectiveId === null)
+      if (ungrouped.length > 0) {
+        const result = autoPromote(wishes, collectives)
+        await applyAutoPromotion(code, hostKey, result.collectives, result.assignments)
+      }
+    }
+    await setPhase(code, hostKey, next)
+  }
 
   const labels: Record<Phase, string> = {
     SETUP: 'Configuring session',
@@ -98,11 +110,7 @@ export function HostRoom({
 
       {NEXT_PHASE[phase] && (
         <div className="wishing-footer">
-          <button
-            type="button"
-            className="btn2 orange"
-            onClick={() => setPhase(code, hostKey, NEXT_PHASE[phase]!)}
-          >
+          <button type="button" className="btn2 orange" onClick={() => advance(NEXT_PHASE[phase]!)}>
             {ADVANCE_LABELS[NEXT_PHASE[phase]!]}
           </button>
         </div>

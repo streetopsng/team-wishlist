@@ -104,7 +104,19 @@ export function canAddToken(tokens: Record<string, number>): boolean {
   return totalTokens(tokens) < TOKENS_PER_PARTICIPANT
 }
 
-/** Ranking derived from tokens: 1 token = 1 point, ties by earliest creation (ADR 0009). */
+/**
+ * Host-finished reveal: the cursor has reached the top slot (ADR 0009).
+ * Distinct from a participant's own acknowledgement (doneResults) — the #1
+ * beat must stay on screen until each participant dismisses it themselves.
+ */
+export function isRevealComplete(revealIndex: number, rankingLength: number): boolean {
+  return rankingLength > 0 && revealIndex >= rankingLength - 1
+}
+
+/**
+ * Ranking derived from tokens: 1 token = 1 point, ties by earliest creation,
+ * then by id so every client computes the identical order (ADR 0009).
+ */
 export function computeRanking(
   collectives: CollectiveWish[],
   participants: Participant[],
@@ -119,7 +131,10 @@ export function computeRanking(
   const ranked = collectives.map((c) => ({ collective: c, points: points.get(c.id)! }))
   ranked.sort(
     (a, b) =>
-      b.points - a.points || a.collective.createdAt - b.collective.createdAt,
+      b.points -
+      a.points ||
+      a.collective.createdAt - b.collective.createdAt ||
+      a.collective.id.localeCompare(b.collective.id),
   )
   return ranked.map((r, i) => ({ ...r, rank: i + 1 }))
 }
@@ -138,7 +153,6 @@ export function autoPromote(
   wishes: Wish[],
   collectives: CollectiveWish[],
 ): { collectives: CollectiveWish[]; assignments: Record<string, string> } {
-  const taken = new Set(wishes.map((w) => w.collectiveId).filter((x): x is string => x !== null))
   const promoted = wishes
     .filter((w) => w.collectiveId === null)
     .map((w) => {
@@ -153,7 +167,6 @@ export function autoPromote(
   }))
   const assignments: Record<string, string> = {}
   for (const { wish, cid } of promoted) assignments[wish.id] = cid
-  void taken
   return { collectives: [...collectives, ...newCollectives], assignments }
 }
 

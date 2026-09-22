@@ -316,16 +316,27 @@ export async function setTokens(
   await set(ref(db, `sessions/${code}/participants/${participant.pid}/tokens`), tokens)
 }
 
-/** Presence: online flag cleared on disconnect (ADR 0004). */
+/**
+ * Presence: online flag cleared on disconnect (ADR 0004).
+ * Re-arms at most one onDisconnect per (re)connection and cancels stale ones
+ * when the effect re-runs, so registrations don't pile up.
+ */
 export function registerPresence(code: string, pid: string): () => void {
   const statusRef = ref(db, `sessions/${code}/participants/${pid}/online`)
   const conn = ref(db, '.info/connected')
-  onDisconnect(statusRef).set(false)
+  let cancelDisconnect: (() => void) | null = null
   const unsub = onValue(conn, (snap) => {
-    if (snap.val() === true) set(statusRef, true).catch(() => undefined)
+    if (snap.val() === true) {
+      cancelDisconnect?.()
+      const d = onDisconnect(statusRef)
+      void d.set(false).catch(() => undefined)
+      cancelDisconnect = () => void d.cancel().catch(() => undefined)
+      set(statusRef, true).catch(() => undefined)
+    }
   })
   return () => {
     unsub()
+    cancelDisconnect?.()
     set(statusRef, false).catch(() => undefined)
   }
 }
