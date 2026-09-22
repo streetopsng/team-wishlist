@@ -95,8 +95,8 @@ export default function App() {
     }
     const result = autoPromote(snapshot.wishes, snapshot.collectives)
     promoteKeyRef.current = key
-    applyAutoPromotion(route.code, result.collectives, result.assignments).catch(() =>
-      promoteKeyRef.current = null,
+    applyAutoPromotion(route.code, route.hostKey, result.collectives, result.assignments).catch(
+      () => (promoteKeyRef.current = null),
     )
   }, [route, snapshot])
 

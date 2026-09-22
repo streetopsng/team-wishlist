@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { hydrateCollectives, hydrateParticipants, hydrateWishes } from './session'
 
+/**
+ * Source-level contract: the meta record written to RTDB must never contain the
+ * host key. (The runtime rules contract lives in rules.test.ts; this guards the
+ * client side of the same P0 — caught live when a smoke test still found the
+ * key in meta after the rules were fixed.)
+ */
+import { readFileSync } from 'node:fs'
+
+it('createSession writes meta without a hostKey field (P0: cascading read)', () => {
+  const src = readFileSync(new URL('./session.ts', import.meta.url), 'utf8')
+  const metaBlock = src.slice(src.indexOf('const meta: SessionMeta'), src.indexOf('runTransaction(sessionRef'))
+  expect(metaBlock).not.toContain('hostKey')
+})
+
 describe('hydrate: RTDB values lack their key, empty objects are dropped (ADR 0004)', () => {
   it('injects wish id from the record key and defaults collectiveId to null', () => {
     const wishes = hydrateWishes({

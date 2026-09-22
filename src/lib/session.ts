@@ -25,6 +25,7 @@ import {
   type Wish,
 } from './domain'
 import { db } from './firebase'
+import { ROSTER_SIZE } from './roster'
 
 export interface SessionMeta {
   name: string
@@ -169,20 +170,25 @@ export async function createSession(
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = generateSessionCode()
     const hostKey = generateHostKey()
-    const meta: SessionMeta & { hostKey: string } = {
+    const meta: SessionMeta = {
       name,
       phase: 'SETUP',
       createdAt: Date.now(),
-      cap: 30,
+      cap: ROSTER_SIZE, // ADR 0005: cap = roster size, single source of truth
       invitedCount,
       source: 'standalone', // ADR 0002: GummyGum-shaped seam
-      hostKey,
     }
     const created = await runTransaction(sessionRef(code), (current) => {
       if (current !== null) return undefined // code taken — abort, retry with a new one
       return { meta }
     })
-    if (created.committed) return { code, hostKey }
+    if (created.committed) {
+      // The key lives OUTSIDE the readable session subtree (rules P0 fix): a child
+      // `.read: false` cannot revoke a cascading read, so sessions/$code/meta must
+      // never hold it. Write-once at the top level, never readable.
+      await set(ref(db, `hostKeys/${code}`), hostKey)
+      return { code, hostKey }
+    }
   }
   throw new Error('Could not generate a unique session code — try again')
 }
@@ -244,55 +250,53 @@ export async function submitWish(
 }
 
 /** Host groups selected wishes into a named collective wish (ADR 0007). */
-export async function saveCollective(
+export function saveCollective(
   code: string,
   hostKey: string,
   selectedWishIds: string[],
   title: string,
 ): Promise<void> {
-  await verifyHost(code, hostKey)
-  const cid = `cw-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
-  const updates: Record<string, unknown> = {
-    [`collectives/${cid}`]: { title, createdAt: Date.now(), autoPromoted: false },
-  }
-  for (const wid of selectedWishIds) updates[`wishes/${wid}/collectiveId`] = cid
-  await update(sessionRef(code), updates)
+  return withHost(code, hostKey, async () => {
+    const cid = `cw-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const updates: Record<string, unknown> = {
+      [`collectives/${cid}`]: { title, createdAt: Date.now(), autoPromoted: false },
+    }
+    for (const wid of selectedWishIds) updates[`wishes/${wid}/collectiveId`] = cid
+    await update(sessionRef(code), updates)
+  })
 }
 
-export async function setPhase(code: string, hostKey: string, phase: Phase): Promise<void> {
-  await verifyHost(code, hostKey)
-  await set(ref(db, `sessions/${code}/meta/phase`), phase)
+export function setPhase(code: string, hostKey: string, phase: Phase): Promise<void> {
+  return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/meta/phase`), phase))
 }
 
-export async function setRevealIndex(
-  code: string,
-  hostKey: string,
-  index: number,
-): Promise<void> {
-  await verifyHost(code, hostKey)
-  await set(ref(db, `sessions/${code}/reveal/index`), index)
+export function setRevealIndex(code: string, hostKey: string, index: number): Promise<void> {
+  return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/reveal/index`), index))
 }
 
 /**
  * Apply auto-promotion atomically (ADR 0007): write new single-wish collectives
  * and set collectiveId on every previously-ungrouped wish.
  */
-export async function applyAutoPromotion(
+export function applyAutoPromotion(
   code: string,
+  hostKey: string,
   collectives: CollectiveWish[],
   assignments: Record<string, string>,
 ): Promise<void> {
-  const updates: Record<string, unknown> = {}
-  const existing = await get(ref(db, `sessions/${code}/collectives`))
-  const existingIds = new Set(Object.keys((existing.val() as Record<string, unknown>) ?? {}))
-  for (const c of collectives) {
-    if (!existingIds.has(c.id)) updates[`collectives/${c.id}`] = c
-  }
-  for (const [wid, cid] of Object.entries(assignments)) {
-    updates[`wishes/${wid}/collectiveId`] = cid
-  }
-  if (Object.keys(updates).length === 0) return
-  await update(sessionRef(code), updates)
+  return withHost(code, hostKey, async () => {
+    const updates: Record<string, unknown> = {}
+    const existing = await get(ref(db, `sessions/${code}/collectives`))
+    const existingIds = new Set(Object.keys((existing.val() as Record<string, unknown>) ?? {}))
+    for (const c of collectives) {
+      if (!existingIds.has(c.id)) updates[`collectives/${c.id}`] = c
+    }
+    for (const [wid, cid] of Object.entries(assignments)) {
+      updates[`wishes/${wid}/collectiveId`] = cid
+    }
+    if (Object.keys(updates).length === 0) return
+    await update(sessionRef(code), updates)
+  })
 }
 
 /** Participant self-service writes. */
@@ -326,8 +330,22 @@ export function registerPresence(code: string, pid: string): () => void {
   }
 }
 
-/** Host proof-of-possession: rules validate the claim against meta/hostKey. */
-async function verifyHost(code: string, hostKey: string): Promise<void> {
-  const claim = await runTransaction(ref(db, `sessions/${code}/hostClaim`), () => hostKey)
-  if (!claim.committed) throw new Error('Host verification failed')
+/**
+ * Host proof-of-possession (ADR 0010, rules P0 fix).
+ *
+ * The client presents the key by writing it to the top-level `claims/{code}`
+ * node; rules accept the write only when it equals `hostKeys/{code}` — which
+ * no client can read. Host-gated writes (meta, collectives, wish updates,
+ * reveal) check the claim server-side. The claim is cleared in a `finally` so
+ * a lingering claim can't become a standing skeleton key for the room.
+ */
+async function withHost<T>(code: string, hostKey: string, fn: () => Promise<T>): Promise<T> {
+  await set(ref(db, `claims/${code}`), hostKey).catch(() => {
+    throw new Error('Host verification failed — check the host link')
+  })
+  try {
+    return await fn()
+  } finally {
+    await remove(ref(db, `claims/${code}`)).catch(() => undefined)
+  }
 }
