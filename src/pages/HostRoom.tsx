@@ -105,7 +105,14 @@ export function HostRoom({
         </PhaseShell>
       )}
       {phase === 'RESULTS' && (
-        <HostResults code={code} hostKey={hostKey} snapshot={snapshot} collectives={collectives} participants={participants} />
+        <HostResults
+          code={code}
+          hostKey={hostKey}
+          snapshot={snapshot}
+          collectives={collectives}
+          participants={participants}
+          wishes={wishes}
+        />
       )}
       {phase === 'COMPLETE' && (
         <HostComplete
@@ -313,12 +320,14 @@ function HostResults({
   snapshot,
   collectives,
   participants,
+  wishes,
 }: {
   code: string
   hostKey: string
   snapshot: SessionSnapshot
   collectives: CollectiveWish[]
   participants: Participant[]
+  wishes: Wish[]
 }) {
   const ranking = useMemo(() => computeRanking(collectives, participants), [collectives, participants])
   const idx = snapshot.revealIndex
@@ -373,6 +382,13 @@ function HostResults({
           }
         >
           {done ? 'End session' : 'Reveal next'}
+        </button>
+        <button
+          type="button"
+          className="btn2 ghost"
+          onClick={() => exportResults(code, snapshot.meta.name, ranking, wishes)}
+        >
+          Download CSV
         </button>
       </div>
     </div>

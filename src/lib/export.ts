@@ -1,9 +1,11 @@
 /**
- * CSV export of session results (first v1.1 feature per ADR 0012 follow-up).
+ * CSV export of session results (v1.1; ADR 0012 item 3 amended 2026-09-24).
  *
- * Pure and Firebase-free so it can be unit tested (AGENT.MD rule 2).
- * RFC 4180 escaping; one row per rank entry, member wishes joined in a
- * single quoted field for spreadsheet-friendly capture.
+ * Serialization (`csvEscape`, `resultsCsv`, `resultsFilename`) is pure and
+ * Firebase-free so it can be unit tested (AGENT.MD rule 2). Only
+ * `downloadCsv` touches the DOM. RFC 4180 escaping; one row per rank entry,
+ * member wishes joined in a single quoted field for spreadsheet-friendly
+ * capture.
  */
 import type { RankEntry, Wish } from './domain'
 
@@ -50,8 +52,8 @@ export function resultsFilename(code: string, sessionName: string): string {
   return `team-wishlist-${code}-${slug}.csv`
 }
 
-/** Trigger a browser download of `csv` as `filename` (no-op-safe outside browser). */
-export function downloadCsv(filename: string, csv: string): void {
+/** Trigger a browser download of `csv` as `filename`. Module-internal: the DOM side effect stays behind `exportResults`. */
+function downloadCsv(filename: string, csv: string): void {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -63,7 +65,7 @@ export function downloadCsv(filename: string, csv: string): void {
   URL.revokeObjectURL(url)
 }
 
-/** Convenience: export a ranking straight to a downloaded file. */
+/** Download a ranking as CSV — the single entry point used by both host screens. */
 export function exportResults(
   code: string,
   sessionName: string,
