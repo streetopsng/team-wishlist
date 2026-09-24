@@ -11,6 +11,7 @@ import {
 } from '@/lib/domain'
 import { applyAutoPromotion, saveCollective, setPhase, setRevealIndex } from '@/lib/session'
 import type { SessionSnapshot } from '@/lib/session'
+import { exportResults } from '@/lib/export'
 
 export function HostRoom({
   code,
@@ -106,7 +107,15 @@ export function HostRoom({
       {phase === 'RESULTS' && (
         <HostResults code={code} hostKey={hostKey} snapshot={snapshot} collectives={collectives} participants={participants} />
       )}
-      {phase === 'COMPLETE' && <HostComplete collectives={collectives} participants={participants} wishes={wishes} />}
+      {phase === 'COMPLETE' && (
+        <HostComplete
+          code={code}
+          sessionName={snapshot.meta.name}
+          collectives={collectives}
+          participants={participants}
+          wishes={wishes}
+        />
+      )}
 
       {NEXT_PHASE[phase] && (
         <div className="wishing-footer">
@@ -371,10 +380,14 @@ function HostResults({
 }
 
 function HostComplete({
+  code,
+  sessionName,
   collectives,
   participants,
   wishes,
 }: {
+  code: string
+  sessionName: string
   collectives: CollectiveWish[]
   participants: Participant[]
   wishes: Wish[]
@@ -417,6 +430,15 @@ function HostComplete({
             points={r.points}
           />
         ))}
+      </div>
+      <div className="wishing-footer">
+        <button
+          type="button"
+          className="btn2 ghost"
+          onClick={() => exportResults(code, sessionName, ranking, wishes)}
+        >
+          Download CSV
+        </button>
       </div>
     </div>
   )
