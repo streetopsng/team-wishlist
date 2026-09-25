@@ -11,10 +11,14 @@ phase while participants are still mid-action.
 
 ## Decision
 
-1. **Secret host link.** Creating a session generates a 128-bit `hostKey` stored under
-   `sessions/{code}/meta`. The host URL is `/host/{code}?key={hostKey}`. Whoever presents the
-   key is the host — control is claimable from any device, refresh-proof, and cannot be
-   brute-forced in practice. No account, per ADR 0012.
+1. **Secret host link.** Creating a session generates a 128-bit `hostKey`. *(Amended
+   2026-09-24: the key is stored at top-level `hostKeys/{code}` — write-once, never
+   readable — not under `sessions/{code}/meta` as originally written; a child `.read: false`
+   cannot revoke a cascading session-level read. Host writes prove possession via the
+   ephemeral `claims/{code}` node. See ADR 0013.)* The host URL is
+   `/host/{code}?key={hostKey}`. Whoever presents the key is the host — control is
+   claimable from any device, refresh-proof, and cannot be brute-forced in practice. No
+   account, per ADR 0012.
 2. **Force-advance.** The host can always move the session forward. A participant who is
    mid-typing when the phase advances simply arrives in the new phase with whatever they had
    submitted; unsubmitted text is lost. Finished participants wait in a lobby state.
