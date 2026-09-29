@@ -206,12 +206,24 @@ export async function createSession(
   throw new Error('Could not generate a unique session code — try again')
 }
 
+/**
+ * A GummyGum invitee's pid is derived from their invite email so a rejoin from any
+ * device lands on the same participant, while the room only ever sees an opaque hash.
+ */
+export async function invitePid(code: string, email: string | null | undefined): Promise<string | null> {
+  const normalized = (email ?? '').trim().toLowerCase()
+  if (!normalized || !globalThis.crypto?.subtle) return null
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`tw:${code}:${normalized}`))
+  return Array.from(new Uint8Array(digest).slice(0, 8), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /** Participant claims an avatar transactionally (ADR 0003/0005). */
 export async function joinSession(
   code: string,
   avatarId: string,
+  presetPid?: string | null,
 ): Promise<{ pid: string }> {
-  const pid = generatePid()
+  const pid = presetPid || generatePid()
   const participantRecord: Omit<Participant, 'pid'> = {
     avatarId,
     joinedAt: Date.now(),

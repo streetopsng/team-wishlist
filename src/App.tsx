@@ -9,7 +9,7 @@ import { SessionExpiredModal } from '@/components/SessionExpiredModal'
 import { SessionEndedScreen } from '@/components/SessionEndedScreen'
 import { autoPromote, isLobbyIdleExpired, isSessionAbandoned } from '@/lib/domain'
 import { clearGummyGumHostKey, clearIdentity, findMe, loadGummyGumHostKey, loadIdentity, saveGummyGumHostKey, saveIdentity } from '@/lib/identity'
-import { applyAutoPromotion, createSession, generateHostKey, markSessionAbandoned, markSessionEnded, registerPresence } from '@/lib/session'
+import { applyAutoPromotion, createSession, generateHostKey, invitePid, markSessionAbandoned, markSessionEnded, registerPresence } from '@/lib/session'
 import { useSession } from '@/hooks/useSession'
 import { gummyGumRoomCode, reportGummyGumCancel, resolveGummyGumLaunch, returnToGummyGum, watchHubSessionStatus, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
@@ -82,10 +82,19 @@ export default function App() {
   const [freshJoin, setFreshJoin] = useState<{ code: string; pid: string; avatarId: string } | null>(
     null,
   )
-  const pid =
-    freshJoin && (route.kind === 'join' || route.kind === 'participant') && freshJoin.code === route.code
-      ? freshJoin.pid
-      : identity?.pid ?? null
+  const participantCode = route.kind === 'join' || route.kind === 'participant' ? route.code : null
+  const ggEmail = ggSession && !ggSession.isHost ? ggSession.player?.email ?? null : null
+  const [ggPid, setGgPid] = useState<{ code: string; pid: string | null } | null>(null)
+  useEffect(() => {
+    if (!participantCode || !ggEmail) return
+    let cancelled = false
+    invitePid(participantCode, ggEmail)
+      .then((derived) => { if (!cancelled) setGgPid({ code: participantCode, pid: derived }) })
+      .catch(() => { if (!cancelled) setGgPid({ code: participantCode, pid: null }) })
+    return () => { cancelled = true }
+  }, [participantCode, ggEmail])
+  const ggPidPending = Boolean(participantCode && ggEmail) && ggPid?.code !== participantCode
+  const invitedPid = ggPid && ggPid.code === participantCode ? ggPid.pid : null
 
   // Subscribe to the hub's code before routing so we know whether to resume or create.
   const code =
@@ -98,6 +107,15 @@ export default function App() {
           : null
 
   const { snapshot, error, loading } = useSession(code)
+
+  // The invite email is the identity: its derived pid wins so the same invitee never gets a second participant.
+  const invitedPidJoined = Boolean(invitedPid && snapshot?.participants.some((p) => p.pid === invitedPid))
+  const pid =
+    freshJoin && participantCode && freshJoin.code === participantCode
+      ? freshJoin.pid
+      : invitedPidJoined
+        ? invitedPid
+        : identity?.pid ?? null
 
   useEffect(() => {
     if (ggRoutedRef.current) return
@@ -251,6 +269,13 @@ export default function App() {
 
   const me = useMemo(() => findMe(snapshot, pid), [snapshot, pid])
 
+  // Adopt a reclaimed invite slot locally so presence and later refreshes use it.
+  useEffect(() => {
+    if (!participantCode || !invitedPidJoined || !me || me.pid !== invitedPid) return
+    if (identity?.pid === invitedPid && freshJoin?.pid === invitedPid) return
+    claimJoin(participantCode, me.pid, me.avatarId)
+  }, [participantCode, invitedPidJoined, invitedPid, me, identity?.pid, freshJoin?.pid, claimJoin])
+
   const expiredModal = expiredContext ? (
     <SessionExpiredModal isHost={route.kind === 'host'} context={expiredContext} hubUrl={ggSession?.hubUrl ?? null} />
   ) : null
@@ -321,12 +346,14 @@ export default function App() {
       return <Splash text={error ?? 'Session not found — check the link.'} />
     }
     if (!me) {
+      if (ggPidPending) return <Splash text="Entering the room…" />
       return (
         <>
           <Join
             code={route.code}
             claimedAvatarIds={snapshot.participants.map((p) => p.avatarId)}
             playerName={ggSession?.player?.name?.trim() || null}
+            presetPid={invitedPid}
             onJoined={(joinedPid, avatarId) => claimJoin(route.code, joinedPid, avatarId)}
           />
           {expiredModal}

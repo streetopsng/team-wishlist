@@ -7,11 +7,13 @@ export function Join({
   code,
   claimedAvatarIds,
   playerName,
+  presetPid,
   onJoined,
 }: {
   code: string
   claimedAvatarIds: string[]
   playerName: string | null
+  presetPid?: string | null
   onJoined: (pid: string, avatarId: string) => void
 }) {
   const [picked, setPicked] = useState<string | null>(null)
@@ -27,7 +29,7 @@ export function Join({
     setBusy(true)
     setError(null)
     try {
-      const { pid } = await joinSession(code, picked)
+      const { pid } = await joinSession(code, picked, presetPid)
       onJoined(pid, picked)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Join failed')
