@@ -162,13 +162,16 @@ export function generatePid(): string {
 /**
  * Create a session atomically. Refuses if the code somehow already exists.
  * Returns the host key so the caller can build the control URL.
+ * `presetCode` pins the session to the GummyGum hub's room code (ADR 0002).
  */
 export async function createSession(
   name: string,
   invitedCount: number,
+  presetCode?: string,
 ): Promise<{ code: string; hostKey: string }> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = generateSessionCode()
+  const attempts = presetCode ? 1 : 5
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const code = presetCode ?? generateSessionCode()
     const hostKey = generateHostKey()
     const meta: SessionMeta = {
       name,
@@ -176,7 +179,7 @@ export async function createSession(
       createdAt: Date.now(),
       cap: ROSTER_SIZE, // ADR 0005: cap = roster size, single source of truth
       invitedCount,
-      source: 'standalone', // ADR 0002: GummyGum-shaped seam
+      source: presetCode ? 'gummygum' : 'standalone', // ADR 0002: GummyGum-shaped seam
     }
     const created = await runTransaction(sessionRef(code), (current) => {
       if (current !== null) return undefined // code taken — abort, retry with a new one
@@ -189,6 +192,7 @@ export async function createSession(
       await set(ref(db, `hostKeys/${code}`), hostKey)
       return { code, hostKey }
     }
+    if (presetCode) throw new Error('A session already exists for this room')
   }
   throw new Error('Could not generate a unique session code — try again')
 }

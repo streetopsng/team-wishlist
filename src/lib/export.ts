@@ -1,3 +1,4 @@
+import { getGummyGumSession } from '@/lib/gummygumSession'
 /**
  * CSV export of session results (v1.1; ADR 0012 item 3 amended 2026-09-24).
  *
@@ -72,5 +73,9 @@ export function exportResults(
   ranking: RankEntry[],
   wishes: Wish[],
 ): void {
-  downloadCsv(resultsFilename(code, sessionName), resultsCsv(ranking, wishes))
+  // Hub-launched sessions must not leak the room PIN into the filename.
+  const filename = getGummyGumSession()
+    ? resultsFilename('', sessionName).replace('team-wishlist--', 'team-wishlist-')
+    : resultsFilename(code, sessionName)
+  downloadCsv(filename, resultsCsv(ranking, wishes))
 }

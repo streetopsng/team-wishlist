@@ -12,15 +12,18 @@ import {
 import { applyAutoPromotion, saveCollective, setPhase, setRevealIndex } from '@/lib/session'
 import type { SessionSnapshot } from '@/lib/session'
 import { exportResults } from '@/lib/export'
+import { reportGummyGumCancel, reportGummyGumResult, returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
 export function HostRoom({
   code,
   hostKey,
   snapshot,
+  ggSession,
 }: {
   code: string
   hostKey: string
   snapshot: SessionSnapshot
+  ggSession: GummyGumLaunchSession | null
 }) {
   const phase = snapshot.meta.phase
   const participants = snapshot.participants
@@ -28,6 +31,7 @@ export function HostRoom({
   const collectives = snapshot.collectives
   const doneWishing = participants.filter((p) => p.doneWishing).length
   const doneAllocating = participants.filter((p) => p.doneAllocating).length
+  const [showCancelModal, setShowCancelModal] = useState(false)
 
   async function advance(next: Phase): Promise<void> {
     if (phase === 'MATCHING' && next === 'PRIORITISATION') {
@@ -36,6 +40,16 @@ export function HostRoom({
         const result = autoPromote(wishes, collectives)
         await applyAutoPromotion(code, hostKey, result.collectives, result.assignments)
       }
+    }
+    if (next === 'COMPLETE' && ggSession?.isHost) {
+      const ranking = computeRanking(collectives, participants)
+      void reportGummyGumResult({
+        name: ggSession.player?.name || 'Host',
+        score: participants.length,
+        wishCount: wishes.length,
+        collectiveCount: collectives.length,
+        topPriority: ranking[0]?.collective.title ?? null,
+      })
     }
     await setPhase(code, hostKey, next)
   }
@@ -72,7 +86,46 @@ export function HostRoom({
   return (
     <div className="host-frame">
       {header}
-      {phase === 'SETUP' && <HostSetup code={code} hostKey={hostKey} snapshot={snapshot} />}
+      {ggSession?.isHost && (
+        <div className="wishing-footer" style={{ justifyContent: 'flex-end', padding: '0 0 4px' }}>
+          <button type="button" className="link-btn2" onClick={() => setShowCancelModal(true)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14" style={{ verticalAlign: '-2px', marginRight: 4 }}><path d="M15 18l-6-6 6-6" /></svg>
+            Back to GummyGum
+          </button>
+        </div>
+      )}
+      {showCancelModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(36,25,52,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setShowCancelModal(false)}
+        >
+          <div
+            style={{ background: 'var(--panel)', border: '2.5px solid var(--line)', borderRadius: 20, boxShadow: '6px 6px 0 var(--line)', padding: 24, maxWidth: 360, width: '100%', textAlign: 'center' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="phase-title" style={{ fontSize: 18 }}>Cancel session?</h3>
+            <p className="phase-prompt">This will close the session for all connected participants and return you to GummyGum.</p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button type="button" className="btn2 ghost" style={{ flex: 1 }} onClick={() => setShowCancelModal(false)}>
+                Stay
+              </button>
+              <button
+                type="button"
+                className="btn2 orange"
+                style={{ flex: 1 }}
+                onClick={async () => {
+                  setShowCancelModal(false)
+                  await reportGummyGumCancel()
+                  returnToGummyGum()
+                }}
+              >
+                Exit to hub
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {phase === 'SETUP' && <HostSetup code={code} hostKey={hostKey} snapshot={snapshot} ggSession={ggSession} />}
       {phase === 'WISHING' && (
         <PhaseShell title="Wishes are open" prompt={`${wishes.length} wishes submitted so far.`}>
           <IdeaWall wishes={wishes.slice(-24)} />
@@ -160,39 +213,49 @@ function HostSetup({
   code,
   hostKey,
   snapshot,
+  ggSession,
 }: {
   code: string
   hostKey: string
   snapshot: SessionSnapshot
+  ggSession: GummyGumLaunchSession | null
 }) {
   const joinUrl = `${window.location.origin}/s/${code}`
   return (
     <div className="screen" style={{ padding: 0, maxWidth: 'none' }}>
       <h2 className="phase-title">Ready to launch</h2>
-      <p className="phase-prompt">
-        “{snapshot.meta.name}” — share the join link with {snapshot.meta.invitedCount} people,
-        then launch.
-      </p>
-      <div className="host-invite-row">
-        <code>{joinUrl}</code>
-        <button
-          type="button"
-          className="btn2 ghost"
-          onClick={() => navigator.clipboard.writeText(joinUrl).catch(() => undefined)}
-        >
-          Copy join link
-        </button>
-      </div>
-      <p className="config-note">
-        Tip: keep this URL's <code>?key=</code> secret — whoever has it controls the session.
-      </p>
-      <button
-        type="button"
-        className="link-btn2"
-        onClick={() => navigator.clipboard.writeText(hostKey).catch(() => undefined)}
-      >
-        Copy host key again
-      </button>
+      {ggSession ? (
+        <p className="phase-prompt">
+          "{snapshot.meta.name}" - GummyGum already invited {snapshot.meta.invitedCount} people. Launch when you're ready.
+        </p>
+      ) : (
+        <>
+          <p className="phase-prompt">
+            “{snapshot.meta.name}” — share the join link with {snapshot.meta.invitedCount} people,
+            then launch.
+          </p>
+          <div className="host-invite-row">
+            <code>{joinUrl}</code>
+            <button
+              type="button"
+              className="btn2 ghost"
+              onClick={() => navigator.clipboard.writeText(joinUrl).catch(() => undefined)}
+            >
+              Copy join link
+            </button>
+          </div>
+          <p className="config-note">
+            Tip: keep this URL's <code>?key=</code> secret — whoever has it controls the session.
+          </p>
+          <button
+            type="button"
+            className="link-btn2"
+            onClick={() => navigator.clipboard.writeText(hostKey).catch(() => undefined)}
+          >
+            Copy host key again
+          </button>
+        </>
+      )}
     </div>
   )
 }

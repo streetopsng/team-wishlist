@@ -6,9 +6,10 @@ import { HostRoom } from '@/pages/HostRoom'
 import { Join } from '@/pages/Join'
 import { Landing } from '@/pages/Landing'
 import { autoPromote } from '@/lib/domain'
-import { clearIdentity, findMe, loadIdentity, saveIdentity } from '@/lib/identity'
-import { applyAutoPromotion, registerPresence } from '@/lib/session'
+import { clearIdentity, findMe, loadGummyGumHostKey, loadIdentity, saveGummyGumHostKey, saveIdentity } from '@/lib/identity'
+import { applyAutoPromotion, createSession, registerPresence } from '@/lib/session'
 import { useSession } from '@/hooks/useSession'
+import { resolveGummyGumLaunch, returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
 type Route =
   | { kind: 'landing' }
@@ -38,6 +39,18 @@ function navigate(to: string) {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
+function GummyGumLockedScreen() {
+  return (
+    <div className="screen center-screen">
+      <h2 className="section-title">This experience is only available through GummyGum</h2>
+      <p className="section-sub">Open it from the GummyGum hub to run a session.</p>
+      <a href="https://gummygum.app" className="btn2 orange" style={{ marginTop: 18, textDecoration: 'none', display: 'inline-block' }}>
+        Go to GummyGum
+      </a>
+    </div>
+  )
+}
+
 export default function App() {
   const [route, setRoute] = useState<Route>(parseRoute)
 
@@ -45,6 +58,19 @@ export default function App() {
     const onPop = () => setRoute(parseRoute())
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  const [ggSession, setGgSession] = useState<GummyGumLaunchSession | null>(null)
+  const [ggAccessState, setGgAccessState] = useState<'checking' | 'granted' | 'denied'>('checking')
+  const [ggResolvingHost, setGgResolvingHost] = useState(false)
+  const [ggHostRecoveryFailed, setGgHostRecoveryFailed] = useState(false)
+  const ggRoutedRef = useRef(false)
+
+  useEffect(() => {
+    resolveGummyGumLaunch().then((gg) => {
+      setGgSession(gg)
+      setGgAccessState(gg ? 'granted' : 'denied')
+    })
   }, [])
 
   // Participant identity (ADR 0003): stored per session code.
@@ -58,14 +84,55 @@ export default function App() {
       ? freshJoin.pid
       : identity?.pid ?? null
 
+  // Subscribe to the hub's code before routing so we know whether to resume or create.
   const code =
-    route.kind === 'host' || route.kind === 'hostKeys'
-      ? route.code
-      : route.kind === 'join' || route.kind === 'participant'
+    ggResolvingHost && ggSession?.roomCode
+      ? ggSession.roomCode
+      : route.kind === 'host' || route.kind === 'hostKeys'
         ? route.code
-        : null
+        : route.kind === 'join' || route.kind === 'participant'
+          ? route.code
+          : null
 
   const { snapshot, error, loading } = useSession(code)
+
+  useEffect(() => {
+    if (ggRoutedRef.current) return
+    if (ggAccessState !== 'granted' || !ggSession) return
+    ggRoutedRef.current = true
+    if (ggSession.isHost && ggSession.roomCode) {
+      const cachedKey = loadGummyGumHostKey(ggSession.roomCode)
+      if (cachedKey) {
+        setRoute({ kind: 'host', code: ggSession.roomCode, hostKey: cachedKey })
+      } else {
+        setGgResolvingHost(true)
+      }
+    } else if (ggSession.roomCode) {
+      setRoute({ kind: 'join', code: ggSession.roomCode })
+    }
+  }, [ggAccessState, ggSession])
+
+  useEffect(() => {
+    if (!ggResolvingHost || !ggSession?.roomCode || loading) return
+    const rc = ggSession.roomCode
+    if (snapshot) {
+      // Host key is write-once and never server-readable (ADR 0010), so it can't be recovered here.
+      setGgResolvingHost(false)
+      setGgHostRecoveryFailed(true)
+      return
+    }
+    const cfg = (ggSession.config as { name?: string; invitedCount?: number } | null) ?? null
+    createSession(cfg?.name || 'Team Wishlist Session', cfg?.invitedCount || ggSession.invitedCount || 10, rc)
+      .then(({ code: createdCode, hostKey }) => {
+        saveGummyGumHostKey(createdCode, hostKey)
+        setGgResolvingHost(false)
+        setRoute({ kind: 'host', code: createdCode, hostKey })
+      })
+      .catch(() => {
+        setGgResolvingHost(false)
+        setGgHostRecoveryFailed(true)
+      })
+  }, [ggResolvingHost, ggSession, loading, snapshot])
 
   // Presence heartbeat for joined participants.
   const presencePid = route.kind === 'participant' && identity ? identity.pid : freshJoin?.pid
@@ -103,8 +170,10 @@ export default function App() {
   const claimJoin = useCallback((joinedCode: string, joinedPid: string, avatarId: string) => {
     saveIdentity({ code: joinedCode, pid: joinedPid, avatarId })
     setFreshJoin({ code: joinedCode, pid: joinedPid, avatarId })
-    navigate(`/s/${joinedCode}`)
-  }, [])
+    // Hub codes may not match the /s/[A-Z2-9]+ route pattern.
+    if (ggSession) setRoute({ kind: 'participant', code: joinedCode })
+    else navigate(`/s/${joinedCode}`)
+  }, [ggSession])
 
   const me = useMemo(() => findMe(snapshot, pid), [snapshot, pid])
 
@@ -112,6 +181,23 @@ export default function App() {
     // surface RTDB errors visibly during development
     if (error) console.error('[useSession]', error)
   }
+
+  if (ggAccessState === 'checking') return <div className="screen center-screen" />
+  if (ggAccessState === 'denied') return <GummyGumLockedScreen />
+
+  if (ggHostRecoveryFailed) {
+    return (
+      <div className="screen center-screen">
+        <h2 className="section-title">Host access couldn&apos;t be restored</h2>
+        <p className="section-sub">Return to GummyGum and relaunch this session as the host.</p>
+        <button type="button" className="btn2 orange" style={{ marginTop: 18 }} onClick={returnToGummyGum}>
+          Back to GummyGum
+        </button>
+      </div>
+    )
+  }
+
+  if (ggResolvingHost) return <Splash text="Opening control room..." />
 
   if (route.kind === 'landing') return <Landing onHost={() => { navigate('/host/create'); setRoute({ kind: 'hostCreate' }) }} />
 
@@ -137,13 +223,16 @@ export default function App() {
   if (route.kind === 'host') {
     if (loading) return <Splash text="Opening control room…" />
     if (!snapshot) return <Splash text={error ?? 'Session not found — check the link.'} />
-    return <HostRoom code={route.code} hostKey={route.hostKey} snapshot={snapshot} />
+    return <HostRoom code={route.code} hostKey={route.hostKey} snapshot={snapshot} ggSession={ggSession} />
   }
 
   // Participant routes: join first if no identity for this session yet.
   if (route.kind === 'join' || route.kind === 'participant') {
     if (loading) return <Splash text="Entering the room…" />
-    if (!snapshot) return <Splash text={error ?? 'Session not found — check the link.'} />
+    if (!snapshot) {
+      if (ggSession && !error) return <Splash text="Waiting for the host to open the room..." />
+      return <Splash text={error ?? 'Session not found — check the link.'} />
+    }
     if (!me) {
       return (
         <Join
@@ -153,7 +242,7 @@ export default function App() {
         />
       )
     }
-    return <ParticipantRoom code={route.code} snapshot={snapshot} me={me} />
+    return <ParticipantRoom code={route.code} snapshot={snapshot} me={me} ggSession={ggSession} />
   }
 
   void clearIdentity // re-exported for future "leave room" affordance
