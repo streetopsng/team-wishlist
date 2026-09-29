@@ -10,7 +10,7 @@ import { autoPromote, isLobbyIdleExpired, isSessionAbandoned } from '@/lib/domai
 import { clearIdentity, findMe, loadGummyGumHostKey, loadIdentity, saveGummyGumHostKey, saveIdentity } from '@/lib/identity'
 import { applyAutoPromotion, createSession, markSessionAbandoned, registerPresence } from '@/lib/session'
 import { useSession } from '@/hooks/useSession'
-import { reportGummyGumCancel, resolveGummyGumLaunch, returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
+import { gummyGumRoomCode, reportGummyGumCancel, resolveGummyGumLaunch, returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
 type Route =
   | { kind: 'landing' }
@@ -66,6 +66,7 @@ export default function App() {
   const [ggResolvingHost, setGgResolvingHost] = useState(false)
   const [ggHostRecoveryFailed, setGgHostRecoveryFailed] = useState(false)
   const ggRoutedRef = useRef(false)
+  const ggRoomCode = gummyGumRoomCode(ggSession)
 
   useEffect(() => {
     resolveGummyGumLaunch().then((gg) => {
@@ -87,8 +88,8 @@ export default function App() {
 
   // Subscribe to the hub's code before routing so we know whether to resume or create.
   const code =
-    ggResolvingHost && ggSession?.roomCode
-      ? ggSession.roomCode
+    ggResolvingHost && ggRoomCode
+      ? ggRoomCode
       : route.kind === 'host' || route.kind === 'hostKeys'
         ? route.code
         : route.kind === 'join' || route.kind === 'participant'
@@ -101,21 +102,21 @@ export default function App() {
     if (ggRoutedRef.current) return
     if (ggAccessState !== 'granted' || !ggSession) return
     ggRoutedRef.current = true
-    if (ggSession.isHost && ggSession.roomCode) {
-      const cachedKey = loadGummyGumHostKey(ggSession.roomCode)
+    if (ggSession.isHost && ggRoomCode) {
+      const cachedKey = loadGummyGumHostKey(ggRoomCode)
       if (cachedKey) {
-        setRoute({ kind: 'host', code: ggSession.roomCode, hostKey: cachedKey })
+        setRoute({ kind: 'host', code: ggRoomCode, hostKey: cachedKey })
       } else {
         setGgResolvingHost(true)
       }
-    } else if (ggSession.roomCode) {
-      setRoute({ kind: 'join', code: ggSession.roomCode })
+    } else if (ggRoomCode) {
+      setRoute({ kind: 'join', code: ggRoomCode })
     }
-  }, [ggAccessState, ggSession])
+  }, [ggAccessState, ggSession, ggRoomCode])
 
   useEffect(() => {
-    if (!ggResolvingHost || !ggSession?.roomCode || loading) return
-    const rc = ggSession.roomCode
+    if (!ggResolvingHost || !ggSession || !ggRoomCode || loading) return
+    const rc = ggRoomCode
     if (snapshot) {
       // Host key is write-once and never server-readable (ADR 0010), so it can't be recovered here.
       setGgResolvingHost(false)
@@ -133,7 +134,7 @@ export default function App() {
         setGgResolvingHost(false)
         setGgHostRecoveryFailed(true)
       })
-  }, [ggResolvingHost, ggSession, loading, snapshot])
+  }, [ggResolvingHost, ggSession, ggRoomCode, loading, snapshot])
 
   const [abandonedOnLoad, setAbandonedOnLoad] = useState(false)
   const abandonCheckedRef = useRef<string | null>(null)
