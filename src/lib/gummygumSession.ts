@@ -143,6 +143,7 @@ export async function reportGummyGumCancel(): Promise<void> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reportToken: session.reportToken }),
+      keepalive: true,
     })
   } catch (err) {
     console.error('GummyGum cancel report failed', err)
@@ -161,6 +162,7 @@ export async function reportGummyGumResult(report: Record<string, unknown>): Pro
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reportToken: session.reportToken, report }),
+      keepalive: true,
     })
     session.reported = true
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session))

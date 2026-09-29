@@ -1,7 +1,7 @@
 /** Shared presentational components, ported from the prototype. */
 import type { ReactNode } from 'react'
 import type { CollectiveWish, Wish } from '@/lib/domain'
-import { avatarById, type BgColor } from '@/lib/roster'
+import { avatarUrl } from '@/lib/roster'
 
 const ICONS: Record<string, string> = {
   people:
@@ -43,11 +43,39 @@ export function AvatarChip({
   avatarId: string
   size?: 'sm' | 'md' | 'lg'
 }) {
-  const avatar = avatarById(avatarId)
   return (
-    <span className={`avatar-chip ${size} bg-${avatar?.bg ?? 'green'}`} aria-hidden="true">
-      {avatar?.emoji ?? '❓'}
+    <span className={`avatar-chip ${size}`} aria-hidden="true">
+      <img src={avatarUrl(avatarId)} alt="" draggable={false} />
     </span>
+  )
+}
+
+const ICON_PATHS = {
+  check: 'M5 12.5l4.5 4.5L19 7.5',
+  close: 'M6 6l12 12M18 6L6 18',
+  logout: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11',
+  arrowRight: 'M5 12h14M13 6l6 6-6 6',
+  minus: 'M6 12h12',
+  plus: 'M12 6v12M6 12h12',
+  user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 20c.8-3.4 3.8-5.5 7.5-5.5s6.7 2.1 7.5 5.5',
+} as const
+
+export function Icon({ name, size = 16 }: { name: keyof typeof ICON_PATHS; size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ flexShrink: 0 }}
+    >
+      <path d={ICON_PATHS[name]} />
+    </svg>
   )
 }
 
@@ -205,7 +233,7 @@ export function CollectiveCard({
               aria-label={`Remove a priority from ${collective.title}`}
               onClick={() => onRemoveToken?.(collective.id)}
             >
-              −
+              <Icon name="minus" size={14} />
             </button>
             <button
               type="button"
@@ -214,7 +242,7 @@ export function CollectiveCard({
               aria-label={`Add a priority to ${collective.title}`}
               onClick={() => onAddToken?.(collective.id)}
             >
-              +
+              <Icon name="plus" size={14} />
             </button>
           </div>
         </div>
@@ -223,4 +251,3 @@ export function CollectiveCard({
   )
 }
 
-export type { BgColor }

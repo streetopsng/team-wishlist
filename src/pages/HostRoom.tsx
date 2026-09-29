@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
-import { BracketFrame, CollectiveCard, IdeaWall, StatBox } from '@/components/ui'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { AvatarChip, CollectiveCard, Icon, IdeaWall } from '@/components/ui'
+import { EndSessionModal } from '@/components/EndSessionModal'
 import {
+  MAX_WISHES,
   NEXT_PHASE,
   autoPromote,
   computeRanking,
@@ -13,6 +15,36 @@ import { applyAutoPromotion, markSessionEnded, saveCollective, setPhase, setReve
 import type { SessionSnapshot } from '@/lib/session'
 import { exportResults } from '@/lib/export'
 import { reportGummyGumCancel, reportGummyGumResult, returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
+
+const PHASE_LABELS: Record<Phase, string> = {
+  SETUP: 'Lobby',
+  WISHING: 'Wishes open',
+  WAITING: 'Wishes closed',
+  REVEAL: 'Wish pool revealed',
+  MATCHING: 'Finding common ground',
+  PRIORITISATION: 'Prioritising',
+  RESULTS: 'Results',
+  COMPLETE: 'Complete',
+}
+
+const ADVANCE_LABELS: Partial<Record<Phase, string>> = {
+  WISHING: 'Open wishes',
+  WAITING: 'Close wishes',
+  REVEAL: 'Reveal wishes',
+  MATCHING: 'Start matching',
+  PRIORITISATION: 'Start prioritisation',
+  RESULTS: 'Reveal results',
+  COMPLETE: 'Finish session',
+}
+
+const STEPS: Array<{ label: string; phases: Phase[] }> = [
+  { label: 'Lobby', phases: ['SETUP'] },
+  { label: 'Wishing', phases: ['WISHING', 'WAITING'] },
+  { label: 'Reveal', phases: ['REVEAL'] },
+  { label: 'Matching', phases: ['MATCHING'] },
+  { label: 'Prioritising', phases: ['PRIORITISATION'] },
+  { label: 'Results', phases: ['RESULTS', 'COMPLETE'] },
+]
 
 export function HostRoom({
   code,
@@ -31,7 +63,23 @@ export function HostRoom({
   const collectives = snapshot.collectives
   const doneWishing = participants.filter((p) => p.doneWishing).length
   const doneAllocating = participants.filter((p) => p.doneAllocating).length
-  const [showCancelModal, setShowCancelModal] = useState(false)
+  const ranking = useMemo(() => computeRanking(collectives, participants), [collectives, participants])
+  const [endOpen, setEndOpen] = useState(false)
+  const [ending, setEnding] = useState(false)
+  const [advancing, setAdvancing] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  async function run(action: () => Promise<void>) {
+    setAdvancing(true)
+    setActionError(null)
+    try {
+      await action()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Something went wrong, try again')
+    } finally {
+      setAdvancing(false)
+    }
+  }
 
   async function advance(next: Phase): Promise<void> {
     if (phase === 'MATCHING' && next === 'PRIORITISATION') {
@@ -42,7 +90,6 @@ export function HostRoom({
       }
     }
     if (next === 'COMPLETE' && ggSession?.isHost) {
-      const ranking = computeRanking(collectives, participants)
       void reportGummyGumResult({
         name: ggSession.player?.name || 'Host',
         score: participants.length,
@@ -54,209 +101,350 @@ export function HostRoom({
     await setPhase(code, hostKey, next)
   }
 
-  const labels: Record<Phase, string> = {
-    SETUP: 'Configuring session',
-    WISHING: 'Making wishes',
-    WAITING: 'Wishes closed',
-    REVEAL: 'Wish pool revealed',
-    MATCHING: 'Finding common ground',
-    PRIORITISATION: 'Prioritising',
-    RESULTS: 'Results',
-    COMPLETE: 'Complete',
+  const closeEnd = useCallback(() => setEndOpen(false), [])
+
+  async function endSession() {
+    setEnding(true)
+    // keepalive lets the cancel report finish even though ending the room navigates away.
+    if (ggSession?.isHost) void reportGummyGumCancel()
+    await markSessionEnded(code, hostKey).catch(() => undefined)
+    returnToGummyGum(ggSession?.hubUrl)
   }
 
-  const header = (
-    <BracketFrame
-      eyebrow="Team Wishlist"
-      title={
-        <>
-          {snapshot.meta.name} <span className="dot">•</span> {labels[phase]}
-        </>
-      }
-    >
-      <div className="stat-row">
-        <StatBox icon="people" label="In room" value={phase === 'SETUP' ? 0 : participants.length} />
-        <StatBox icon="star" label="Ready" value={doneWishing} />
-        <StatBox icon="bulb" label="Wishes" value={wishes.length} />
-        <StatBox icon="puzzle" label="Collective" value={collectives.length} />
-      </div>
-    </BracketFrame>
-  )
+  const next = NEXT_PHASE[phase]
+  const joined = participants.length
+  const online = participants.filter((p) => p.online).length
+
+  let status: ReactNode = null
+  let primary: ReactNode = null
+  let secondary: ReactNode = null
+
+  if (phase === 'SETUP') {
+    status = joined === 0 ? 'Waiting for people to join' : `${joined} ${joined === 1 ? 'person' : 'people'} in the room`
+  } else if (phase === 'WISHING') {
+    status = `${doneWishing} of ${joined} done, ${wishes.length} ${wishes.length === 1 ? 'wish' : 'wishes'}`
+  } else if (phase === 'WAITING') {
+    status = `${wishes.length} ${wishes.length === 1 ? 'wish' : 'wishes'} collected`
+  } else if (phase === 'MATCHING') {
+    const left = wishes.filter((w) => w.collectiveId === null).length
+    status = `${collectives.length} collective, ${left} unmatched`
+  } else if (phase === 'PRIORITISATION') {
+    status = `${doneAllocating} of ${joined} prioritised`
+  }
+
+  if (phase === 'RESULTS') {
+    const n = ranking.length
+    const idx = snapshot.revealIndex
+    const done = idx >= n - 1
+    status = `${Math.min(idx + 1, n)} of ${n} revealed`
+    primary = (
+      <button
+        type="button"
+        className="btn2 orange"
+        disabled={advancing}
+        onClick={() => run(() => (done ? advance('COMPLETE') : setRevealIndex(code, hostKey, Math.min(idx + 1, n - 1))))}
+      >
+        {done ? ADVANCE_LABELS.COMPLETE : 'Reveal next'}
+      </button>
+    )
+    secondary = (
+      <button type="button" className="btn-plain" onClick={() => exportResults(code, snapshot.meta.name, ranking, wishes)}>
+        Download CSV
+      </button>
+    )
+  } else if (phase === 'COMPLETE') {
+    status = 'Results saved'
+    secondary = (
+      <button type="button" className="btn-plain" onClick={() => exportResults(code, snapshot.meta.name, ranking, wishes)}>
+        Download CSV
+      </button>
+    )
+    if (ggSession) {
+      primary = (
+        <button type="button" className="btn2 orange" onClick={() => returnToGummyGum(ggSession.hubUrl)}>
+          Back to GummyGum
+        </button>
+      )
+    }
+  } else if (next) {
+    const blocked = phase === 'SETUP' && joined === 0
+    primary = (
+      <button type="button" className="btn2 orange" disabled={advancing || blocked} onClick={() => run(() => advance(next))}>
+        {ADVANCE_LABELS[next]}
+      </button>
+    )
+  }
+
+  const stepIndex = STEPS.findIndex((s) => s.phases.includes(phase))
 
   return (
-    <div className="host-frame">
-      {header}
-      {ggSession?.isHost && (
-        <div className="wishing-footer" style={{ justifyContent: 'flex-end', padding: '0 0 4px' }}>
-          <button type="button" className="link-btn2" onClick={() => setShowCancelModal(true)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14" style={{ verticalAlign: '-2px', marginRight: 4 }}><path d="M15 18l-6-6 6-6" /></svg>
-            Back to GummyGum
-          </button>
+    <div className="host-shell">
+      <header className="host-topbar">
+        <div className="host-topbar-title">
+          <span className="host-topbar-eyebrow">Team Wishlist</span>
+          <h1>{snapshot.meta.name}</h1>
         </div>
-      )}
-      {showCancelModal && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(36,25,52,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-          onClick={() => setShowCancelModal(false)}
-        >
-          <div
-            style={{ background: 'var(--panel)', border: '2.5px solid var(--line)', borderRadius: 20, boxShadow: '6px 6px 0 var(--line)', padding: 24, maxWidth: 360, width: '100%', textAlign: 'center' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="phase-title" style={{ fontSize: 18 }}>Cancel session?</h3>
-            <p className="phase-prompt">This will close the session for all connected participants and return you to GummyGum.</p>
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button type="button" className="btn2 ghost" style={{ flex: 1 }} onClick={() => setShowCancelModal(false)}>
-                Stay
-              </button>
-              <button
-                type="button"
-                className="btn2 orange"
-                style={{ flex: 1 }}
-                onClick={async () => {
-                  setShowCancelModal(false)
-                  await reportGummyGumCancel()
-                  await markSessionEnded(code, hostKey).catch(() => undefined)
-                  returnToGummyGum(ggSession?.hubUrl)
+        <div className="host-topbar-actions">
+          <span className="phase-badge">{PHASE_LABELS[phase]}</span>
+          {phase !== 'COMPLETE' && (
+            <button type="button" className="btn-end" onClick={() => setEndOpen(true)}>
+              <Icon name="logout" size={15} />
+              End session
+            </button>
+          )}
+        </div>
+      </header>
+
+      <ol className="host-steps" aria-label="Session progress">
+        {STEPS.map((s, i) => {
+          const state = phase === 'COMPLETE' || i < stepIndex ? 'done' : i === stepIndex ? 'current' : 'todo'
+          return (
+            <li key={s.label} className={`host-step ${state}`} aria-current={state === 'current' ? 'step' : undefined}>
+              <span className="host-step-bar" />
+              <span className="host-step-label">{s.label}</span>
+            </li>
+          )
+        })}
+      </ol>
+
+      <main className="host-body">
+        {phase === 'SETUP' && (
+          <HostLobby code={code} hostKey={hostKey} snapshot={snapshot} ggSession={ggSession} online={online} />
+        )}
+        {(phase === 'WISHING' || phase === 'WAITING') && (
+          <SplitLayout
+            aside={
+              <RosterPanel
+                title="In the room"
+                meta={`${doneWishing} of ${joined} done`}
+                participants={participants}
+                statusFor={(p) => {
+                  if (p.doneWishing) return { text: 'Done', tone: 'done' }
+                  const count = wishes.filter((w) => w.authorPid === p.pid).length
+                  return { text: `${count} of ${MAX_WISHES} wishes`, tone: count > 0 ? 'active' : 'idle' }
                 }}
-              >
-                Exit to hub
-              </button>
+              />
+            }
+          >
+            <Panel
+              title={phase === 'WISHING' ? 'Incoming wishes' : 'Wishes closed'}
+              meta={`${wishes.length} ${wishes.length === 1 ? 'wish' : 'wishes'}`}
+            >
+              {wishes.length === 0 ? (
+                <EmptyState text="Wishes will appear here the moment they are submitted." />
+              ) : (
+                <IdeaWall wishes={wishes} />
+              )}
+            </Panel>
+          </SplitLayout>
+        )}
+        {phase === 'REVEAL' && (
+          <Panel title="Look what we're wishing for" meta={`${wishes.length} wishes from ${joined} people`}>
+            <IdeaWall wishes={wishes} />
+          </Panel>
+        )}
+        {phase === 'MATCHING' && (
+          <HostMatching code={code} hostKey={hostKey} wishes={wishes} collectives={collectives} />
+        )}
+        {phase === 'PRIORITISATION' && (
+          <SplitLayout
+            aside={
+              <RosterPanel
+                title="Prioritising"
+                meta={`${doneAllocating} of ${joined} done`}
+                participants={participants}
+                statusFor={(p) =>
+                  p.doneAllocating ? { text: 'Done', tone: 'done' } : { text: 'Choosing', tone: 'active' }
+                }
+              />
+            }
+          >
+            <Panel title="Collective wishes" meta={`${collectives.length} to prioritise`}>
+              <div className="collective-grid">
+                {collectives.map((c) => (
+                  <CollectiveCard key={c.id} collective={c} wishes={wishes} />
+                ))}
+              </div>
+            </Panel>
+          </SplitLayout>
+        )}
+        {phase === 'RESULTS' && <HostResults ranking={ranking} revealIndex={snapshot.revealIndex} />}
+        {phase === 'COMPLETE' && (
+          <HostComplete ranking={ranking} participants={participants} wishes={wishes} collectives={collectives} />
+        )}
+      </main>
+
+      {(primary || secondary || status) && (
+        <footer className="host-actionbar">
+          <div className="host-actionbar-inner">
+            <div className="host-actionbar-status">
+              {status}
+              {actionError && <span className="form-error">{actionError}</span>}
+            </div>
+            <div className="host-actionbar-buttons">
+              {secondary}
+              {primary}
             </div>
           </div>
-        </div>
-      )}
-      {phase === 'SETUP' && <HostSetup code={code} hostKey={hostKey} snapshot={snapshot} ggSession={ggSession} />}
-      {phase === 'WISHING' && (
-        <PhaseShell title="Wishes are open" prompt={`${wishes.length} wishes submitted so far.`}>
-          <IdeaWall wishes={wishes.slice(-24)} />
-        </PhaseShell>
-      )}
-      {phase === 'WAITING' && (
-        <PhaseShell
-          title="Wishes closed"
-          prompt={`${doneWishing} / ${participants.length} people ready. ${wishes.length} wishes collected.`}
-        />
-      )}
-      {phase === 'REVEAL' && (
-        <PhaseShell title="Look what we're wishing for" prompt="Everyone brought something to the room.">
-          <IdeaWall wishes={wishes} />
-        </PhaseShell>
-      )}
-      {phase === 'MATCHING' && (
-        <HostMatching code={code} hostKey={hostKey} wishes={wishes} collectives={collectives} />
-      )}
-      {phase === 'PRIORITISATION' && (
-        <PhaseShell
-          title="Team is prioritising"
-          prompt={`${doneAllocating} / ${participants.length} participants complete.`}
-        >
-          <div className="collective-grid">
-            {collectives.map((c) => (
-              <CollectiveCard key={c.id} collective={c} wishes={wishes} />
-            ))}
-          </div>
-        </PhaseShell>
-      )}
-      {phase === 'RESULTS' && (
-        <HostResults
-          code={code}
-          hostKey={hostKey}
-          snapshot={snapshot}
-          collectives={collectives}
-          participants={participants}
-          wishes={wishes}
-        />
-      )}
-      {phase === 'COMPLETE' && (
-        <HostComplete
-          code={code}
-          sessionName={snapshot.meta.name}
-          collectives={collectives}
-          participants={participants}
-          wishes={wishes}
-        />
+        </footer>
       )}
 
-      {NEXT_PHASE[phase] && (
-        <div className="wishing-footer">
-          <button type="button" className="btn2 orange" onClick={() => advance(NEXT_PHASE[phase]!)}>
-            {ADVANCE_LABELS[NEXT_PHASE[phase]!]}
-          </button>
-        </div>
-      )}
+      {endOpen && <EndSessionModal busy={ending} onCancel={closeEnd} onConfirm={endSession} />}
     </div>
   )
 }
 
-const ADVANCE_LABELS: Record<Phase, string> = {
-  WISHING: 'Launch session',
-  WAITING: 'Close wishes',
-  REVEAL: 'Reveal wishes',
-  MATCHING: 'Start matching',
-  PRIORITISATION: 'Start prioritisation',
-  RESULTS: 'Reveal results',
-  COMPLETE: 'End session',
-  SETUP: '',
-}
-
-function PhaseShell({ title, prompt, children }: { title: string; prompt: string; children?: React.ReactNode }) {
+function Panel({ title, meta, children }: { title: string; meta?: string; children: ReactNode }) {
   return (
-    <div className="screen" style={{ padding: 0, maxWidth: 'none' }}>
-      <h2 className="phase-title">{title}</h2>
-      <p className="phase-prompt">{prompt}</p>
+    <section className="host-panel">
+      <div className="host-panel-head">
+        <h2>{title}</h2>
+        {meta && <span className="host-panel-meta">{meta}</span>}
+      </div>
       {children}
+    </section>
+  )
+}
+
+function SplitLayout({ aside, children }: { aside: ReactNode; children: ReactNode }) {
+  return (
+    <div className="host-split">
+      <div className="host-split-main">{children}</div>
+      <div className="host-split-aside">{aside}</div>
     </div>
   )
 }
 
-function HostSetup({
+function EmptyState({ text }: { text: string }) {
+  return <p className="host-empty">{text}</p>
+}
+
+type Tone = 'done' | 'active' | 'idle'
+
+function RosterPanel({
+  title,
+  meta,
+  participants,
+  statusFor,
+}: {
+  title: string
+  meta: string
+  participants: Participant[]
+  statusFor?: (p: Participant) => { text: string; tone: Tone }
+}) {
+  return (
+    <Panel title={title} meta={meta}>
+      <RosterList participants={participants} statusFor={statusFor} />
+    </Panel>
+  )
+}
+
+function RosterList({
+  participants,
+  statusFor,
+}: {
+  participants: Participant[]
+  statusFor?: (p: Participant) => { text: string; tone: Tone }
+}) {
+  const sorted = [...participants].sort((a, b) => a.joinedAt - b.joinedAt)
+  if (sorted.length === 0) {
+    return <EmptyState text="Nobody here yet. People appear the moment they pick an avatar." />
+  }
+  return (
+    <ul className="roster">
+      {sorted.map((p) => {
+        const s = statusFor?.(p)
+        return (
+          <li key={p.pid} className={`roster-item ${p.online ? '' : 'away'}`}>
+            <span className="roster-avatar">
+              <AvatarChip avatarId={p.avatarId} size="md" />
+              <span className={`presence-dot ${p.online ? 'on' : 'off'}`} aria-label={p.online ? 'Online' : 'Away'} />
+            </span>
+            <span className={`roster-status ${p.online ? s?.tone ?? '' : ''}`}>
+              {p.online && s?.tone === 'done' && <Icon name="check" size={12} />}
+              {p.online ? s?.text ?? 'Joined' : 'Away'}
+            </span>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function HostLobby({
   code,
   hostKey,
   snapshot,
   ggSession,
+  online,
 }: {
   code: string
   hostKey: string
   snapshot: SessionSnapshot
   ggSession: GummyGumLaunchSession | null
+  online: number
 }) {
+  const joined = snapshot.participants.length
+  const invited = snapshot.meta.invitedCount
   const joinUrl = `${window.location.origin}/s/${code}`
+  const pct = invited > 0 ? Math.min(100, Math.round((joined / invited) * 100)) : 0
+
   return (
-    <div className="screen" style={{ padding: 0, maxWidth: 'none' }}>
-      <h2 className="phase-title">Ready to launch</h2>
-      {ggSession ? (
-        <p className="phase-prompt">
-          "{snapshot.meta.name}" - GummyGum already invited {snapshot.meta.invitedCount} people. Launch when you're ready.
-        </p>
-      ) : (
-        <>
-          <p className="phase-prompt">
-            “{snapshot.meta.name}” — share the join link with {snapshot.meta.invitedCount} people,
-            then launch.
-          </p>
-          <div className="host-invite-row">
-            <code>{joinUrl}</code>
-            <button
-              type="button"
-              className="btn2 ghost"
-              onClick={() => navigator.clipboard.writeText(joinUrl).catch(() => undefined)}
-            >
-              Copy join link
-            </button>
+    <div className="host-split lobby">
+      <div className="host-split-main">
+        <section className="host-panel">
+          <div className="host-panel-head">
+            <h2>Waiting room</h2>
+            <span className="host-panel-meta">{online} online</span>
           </div>
-          <p className="config-note">
-            Tip: keep this URL's <code>?key=</code> secret — whoever has it controls the session.
-          </p>
-          <button
-            type="button"
-            className="link-btn2"
-            onClick={() => navigator.clipboard.writeText(hostKey).catch(() => undefined)}
-          >
-            Copy host key again
-          </button>
-        </>
-      )}
+          <div className="lobby-count">
+            <span className="lobby-count-num">{joined}</span>
+            <span className="lobby-count-of">{invited > 0 ? `of ${invited} invited have joined` : 'joined'}</span>
+          </div>
+          {invited > 0 && (
+            <div className="lobby-progress" aria-hidden="true">
+              <div className="lobby-progress-fill" style={{ width: `${pct}%` }} />
+            </div>
+          )}
+          <RosterList participants={snapshot.participants} />
+        </section>
+      </div>
+      <div className="host-split-aside">
+        <section className="host-panel">
+          <div className="host-panel-head">
+            <h2>How it runs</h2>
+          </div>
+          <ol className="lobby-steps">
+            <li><strong>Wish</strong> Everyone adds up to {MAX_WISHES} anonymous wishes.</li>
+            <li><strong>Reveal</strong> You show the whole wish pool to the room.</li>
+            <li><strong>Match</strong> You group wishes that ask for the same thing.</li>
+            <li><strong>Prioritise</strong> Everyone spends 3 priorities.</li>
+            <li><strong>Results</strong> You reveal the ranking, lowest to highest.</li>
+          </ol>
+          {!ggSession && (
+            <div className="lobby-share">
+              <span className="field-readonly-label">Join link</span>
+              <div className="host-invite-row">
+                <code>{joinUrl}</code>
+                <button
+                  type="button"
+                  className="btn-plain"
+                  onClick={() => navigator.clipboard.writeText(joinUrl).catch(() => undefined)}
+                >
+                  Copy
+                </button>
+              </div>
+              <button
+                type="button"
+                className="link-btn2"
+                onClick={() => navigator.clipboard.writeText(hostKey).catch(() => undefined)}
+              >
+                Copy host key
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   )
 }
@@ -292,13 +480,8 @@ function HostMatching({
   }
 
   return (
-    <div className="screen" style={{ padding: 0, maxWidth: 'none' }}>
-      <h2 className="phase-title">Find the common ground</h2>
-      <p className="phase-prompt">Some wishes may be asking for the same thing. Let's bring them together.</p>
-      <p className="wall-caption">
-        {collectives.length} collective {collectives.length === 1 ? 'wish' : 'wishes'} created ·{' '}
-        {unmatched.length} wishes remaining
-      </p>
+    <Panel title="Find the common ground" meta={`${unmatched.length} wishes remaining`}>
+      <p className="host-panel-lead">Select wishes that ask for the same thing, then name them as one collective wish.</p>
       <IdeaWall wishes={unmatched} selectable selectedIds={selected} onToggle={toggle} />
 
       {selected.length > 0 && !naming && (
@@ -308,7 +491,7 @@ function HostMatching({
           </span>
           <span className="match-bar-question">Do these belong together?</span>
           <div className="match-bar-actions">
-            <button type="button" className="btn2 ghost" onClick={() => setSelected([])}>
+            <button type="button" className="btn-plain" onClick={() => setSelected([])}>
               Keep separate
             </button>
             <button
@@ -331,13 +514,13 @@ function HostMatching({
           <div className="naming-quotes">
             {selectedWishes.map((w) => (
               <div key={w.id} className="naming-quote">
-                “{w.text}”
+                &ldquo;{w.text}&rdquo;
               </div>
             ))}
           </div>
           <input
             className="naming-input"
-            placeholder="Name this collective wish…"
+            placeholder="Name this collective wish"
             aria-label="Collective wish title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -345,7 +528,7 @@ function HostMatching({
           <div className="naming-actions">
             <button
               type="button"
-              className="btn2 ghost"
+              className="btn-plain"
               onClick={() => {
                 setSelected([])
                 setNaming(false)
@@ -363,120 +546,81 @@ function HostMatching({
 
       {collectives.length > 0 && (
         <div className="collective-strip">
-          {collectives.map((c) => (
-            <div key={c.id} className="mini-collective">
-              <strong>{c.title}</strong>
-              <span>
-                {wishes.filter((w) => w.collectiveId === c.id).length}{' '}
-                {wishes.filter((w) => w.collectiveId === c.id).length === 1 ? 'wish' : 'wishes'}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function HostResults({
-  code,
-  hostKey,
-  snapshot,
-  collectives,
-  participants,
-  wishes,
-}: {
-  code: string
-  hostKey: string
-  snapshot: SessionSnapshot
-  collectives: CollectiveWish[]
-  participants: Participant[]
-  wishes: Wish[]
-}) {
-  const ranking = useMemo(() => computeRanking(collectives, participants), [collectives, participants])
-  const idx = snapshot.revealIndex
-  const n = ranking.length
-  const done = idx >= n - 1
-  const current = idx >= 0 ? ranking[n - 1 - idx] : null
-  const shown = idx + 1
-
-  return (
-    <div className="screen" style={{ padding: 0, maxWidth: 'none' }}>
-      <h2 className="phase-title">This is what we want</h2>
-      <div className="results-layout">
-        <div className="rankings-panel">
-          <div className="rankings-title">Live rankings</div>
-          {ranking.map((r) => {
-            const filled = n - r.rank < shown
+          {collectives.map((c) => {
+            const count = wishes.filter((w) => w.collectiveId === c.id).length
             return (
-              <div key={r.collective.id} className={`rank-slot ${filled ? 'filled' : ''}`}>
-                <span className="rank-slot-num">{r.rank}</span>
-                <div className="rank-slot-body">
-                  <span className="rank-slot-title">{filled ? r.collective.title : ''}</span>
-                  {filled && <span className="rank-slot-points">{r.points} pts</span>}
-                </div>
+              <div key={c.id} className="mini-collective">
+                <strong>{c.title}</strong>
+                <span>
+                  {count} {count === 1 ? 'wish' : 'wishes'}
+                </span>
               </div>
             )
           })}
         </div>
-        <div className="reveal-main">
-          {current ? (
-            <>
-              <span className="reveal-tag">Rank</span>
-              <div className="reveal-rank">#{current.rank}</div>
-              <h3 className="reveal-title">{current.collective.title}</h3>
-              <div className="reveal-points">{current.points} priority points</div>
-            </>
-          ) : (
-            <p className="reveal-empty">Click "Reveal next" to start the countdown…</p>
-          )}
-        </div>
+      )}
+    </Panel>
+  )
+}
+
+function HostResults({
+  ranking,
+  revealIndex,
+}: {
+  ranking: ReturnType<typeof computeRanking>
+  revealIndex: number
+}) {
+  const n = ranking.length
+  const current = revealIndex >= 0 ? ranking[n - 1 - revealIndex] : null
+  const shown = revealIndex + 1
+
+  return (
+    <div className="results-layout">
+      <div className="rankings-panel">
+        <div className="rankings-title">Live rankings</div>
+        {ranking.map((r) => {
+          const filled = n - r.rank < shown
+          return (
+            <div key={r.collective.id} className={`rank-slot ${filled ? 'filled' : ''}`}>
+              <span className="rank-slot-num">{r.rank}</span>
+              <div className="rank-slot-body">
+                <span className="rank-slot-title">{filled ? r.collective.title : ''}</span>
+                {filled && <span className="rank-slot-points">{r.points} pts</span>}
+              </div>
+            </div>
+          )
+        })}
       </div>
-      <p className="results-caption">
-        {shown} of {n} revealed
-      </p>
-      <div className="wishing-footer">
-        <button
-          type="button"
-          className="btn2 orange full"
-          onClick={() =>
-            done
-              ? setPhase(code, hostKey, 'COMPLETE')
-              : setRevealIndex(code, hostKey, Math.min(idx + 1, n - 1))
-          }
-        >
-          {done ? 'End session' : 'Reveal next'}
-        </button>
-        <button
-          type="button"
-          className="btn2 ghost"
-          onClick={() => exportResults(code, snapshot.meta.name, ranking, wishes)}
-        >
-          Download CSV
-        </button>
+      <div className="reveal-main">
+        {current ? (
+          <>
+            <span className="reveal-tag">Rank</span>
+            <div className="reveal-rank">#{current.rank}</div>
+            <h3 className="reveal-title">{current.collective.title}</h3>
+            <div className="reveal-points">{current.points} priority points</div>
+          </>
+        ) : (
+          <p className="reveal-empty">Press Reveal next to start the countdown.</p>
+        )}
       </div>
     </div>
   )
 }
 
 function HostComplete({
-  code,
-  sessionName,
-  collectives,
+  ranking,
   participants,
   wishes,
+  collectives,
 }: {
-  code: string
-  sessionName: string
-  collectives: CollectiveWish[]
+  ranking: ReturnType<typeof computeRanking>
   participants: Participant[]
   wishes: Wish[]
+  collectives: CollectiveWish[]
 }) {
-  const ranking = computeRanking(collectives, participants)
   const top = ranking[0]
   return (
-    <div className="screen" style={{ padding: 0, maxWidth: 'none' }}>
-      <h2 className="phase-title">Session results</h2>
+    <Panel title="Session results">
       <div className="host-stats-grid">
         <div className="host-stat">
           <strong>{participants.length}</strong>
@@ -511,15 +655,6 @@ function HostComplete({
           />
         ))}
       </div>
-      <div className="wishing-footer">
-        <button
-          type="button"
-          className="btn2 ghost"
-          onClick={() => exportResults(code, sessionName, ranking, wishes)}
-        >
-          Download CSV
-        </button>
-      </div>
-    </div>
+    </Panel>
   )
 }

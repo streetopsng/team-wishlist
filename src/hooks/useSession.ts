@@ -3,36 +3,35 @@ import { useEffect, useState } from 'react'
 import type { SessionSnapshot } from '@/lib/session'
 import { subscribeSession } from '@/lib/session'
 
+interface SessionState {
+  code: string | null
+  snapshot: SessionSnapshot | null
+  error: string | null
+}
+
 export function useSession(code: string | null): {
   snapshot: SessionSnapshot | null
   error: string | null
   loading: boolean
 } {
-  const [snapshot, setSnapshot] = useState<SessionSnapshot | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [state, setState] = useState<SessionState>({ code: null, snapshot: null, error: null })
 
   useEffect(() => {
-    if (!code) {
-      setSnapshot(null)
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    setError(null)
-    const unsub = subscribeSession(
+    if (!code) return undefined
+    return subscribeSession(
       code,
-      (snap) => {
-        setSnapshot(snap)
-        setLoading(false)
-      },
-      (err) => {
-        setError(err.message)
-        setLoading(false)
-      },
+      (snap) => setState({ code, snapshot: snap, error: null }),
+      (err) =>
+        setState((prev) => ({ code, snapshot: prev.code === code ? prev.snapshot : null, error: err.message })),
     )
-    return unsub
   }, [code])
 
-  return { snapshot, error, loading }
+  if (!code) return { snapshot: null, error: null, loading: false }
+  // State from a previous code must read as loading, or callers act on a stale "no room yet".
+  const current = state.code === code
+  return {
+    snapshot: current ? state.snapshot : null,
+    error: current ? state.error : null,
+    loading: !current,
+  }
 }

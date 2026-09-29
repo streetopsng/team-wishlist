@@ -130,7 +130,7 @@ export function subscribeSession(
           name: String(metaRaw.name ?? ''),
           phase: (metaRaw.phase ?? 'SETUP') as Phase,
           createdAt: Number(metaRaw.createdAt ?? 0),
-          cap: Number(metaRaw.cap ?? 30),
+          cap: Number(metaRaw.cap ?? ROSTER_SIZE),
           invitedCount: Number(metaRaw.invitedCount ?? 0),
           source: String(metaRaw.source ?? 'standalone'),
           phaseChangedAt: Number(metaRaw.phaseChangedAt ?? 0),
@@ -176,11 +176,12 @@ export async function createSession(
   name: string,
   invitedCount: number,
   presetCode?: string,
+  presetHostKey?: string,
 ): Promise<{ code: string; hostKey: string }> {
   const attempts = presetCode ? 1 : 5
   for (let attempt = 0; attempt < attempts; attempt++) {
     const code = presetCode ?? generateSessionCode()
-    const hostKey = generateHostKey()
+    const hostKey = presetHostKey ?? generateHostKey()
     const meta: SessionMeta = {
       name,
       phase: 'SETUP',

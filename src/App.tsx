@@ -8,8 +8,8 @@ import { Landing } from '@/pages/Landing'
 import { SessionExpiredModal } from '@/components/SessionExpiredModal'
 import { SessionEndedScreen } from '@/components/SessionEndedScreen'
 import { autoPromote, isLobbyIdleExpired, isSessionAbandoned } from '@/lib/domain'
-import { clearIdentity, findMe, loadGummyGumHostKey, loadIdentity, saveGummyGumHostKey, saveIdentity } from '@/lib/identity'
-import { applyAutoPromotion, createSession, markSessionAbandoned, markSessionEnded, registerPresence } from '@/lib/session'
+import { clearGummyGumHostKey, clearIdentity, findMe, loadGummyGumHostKey, loadIdentity, saveGummyGumHostKey, saveIdentity } from '@/lib/identity'
+import { applyAutoPromotion, createSession, generateHostKey, markSessionAbandoned, markSessionEnded, registerPresence } from '@/lib/session'
 import { useSession } from '@/hooks/useSession'
 import { gummyGumRoomCode, reportGummyGumCancel, resolveGummyGumLaunch, returnToGummyGum, watchHubSessionStatus, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
@@ -115,8 +115,11 @@ export default function App() {
     }
   }, [ggAccessState, ggSession, ggRoomCode])
 
+  // Our own createSession fires the listener before it resolves; without this guard that
+  // snapshot read as "someone else's room" and failed the first launch.
+  const ggCreateStartedRef = useRef(false)
   useEffect(() => {
-    if (!ggResolvingHost || !ggSession || !ggRoomCode || loading) return
+    if (!ggResolvingHost || !ggSession || !ggRoomCode || loading || ggCreateStartedRef.current) return
     const rc = ggRoomCode
     if (snapshot) {
       // Host key is write-once and never server-readable (ADR 0010), so it can't be recovered here.
@@ -124,14 +127,18 @@ export default function App() {
       setGgHostRecoveryFailed(true)
       return
     }
+    ggCreateStartedRef.current = true
     const cfg = (ggSession.config as { name?: string; invitedCount?: number } | null) ?? null
-    createSession(cfg?.name || 'Team Wishlist Session', cfg?.invitedCount || ggSession.invitedCount || 10, rc)
+    // Cached before any write so a tab closed mid-create can still resume the room.
+    const presetKey = generateHostKey()
+    saveGummyGumHostKey(rc, presetKey)
+    createSession(cfg?.name || 'Team Wishlist Session', cfg?.invitedCount || ggSession.invitedCount || 10, rc, presetKey)
       .then(({ code: createdCode, hostKey }) => {
-        saveGummyGumHostKey(createdCode, hostKey)
         setGgResolvingHost(false)
         setRoute({ kind: 'host', code: createdCode, hostKey })
       })
       .catch(() => {
+        clearGummyGumHostKey(rc)
         setGgResolvingHost(false)
         setGgHostRecoveryFailed(true)
       })
@@ -319,6 +326,7 @@ export default function App() {
           <Join
             code={route.code}
             claimedAvatarIds={snapshot.participants.map((p) => p.avatarId)}
+            playerName={ggSession?.player?.name?.trim() || null}
             onJoined={(joinedPid, avatarId) => claimJoin(route.code, joinedPid, avatarId)}
           />
           {expiredModal}

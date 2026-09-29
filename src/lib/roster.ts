@@ -1,32 +1,21 @@
-/** The avatar roster: 30 unique emoji + background-color pairs (ADR 0005). */
+/** The avatar roster: the GummyGum hub avatar set every experience hotlinks (ADR 0005). */
 
-export const BG_COLORS = ['green', 'blue', 'pink', 'yellow', 'coral', 'greenLight'] as const
-export type BgColor = (typeof BG_COLORS)[number]
+export const GUMMYGUM_AVATAR_BASE_URL = 'https://gummygum.app/avatars'
 
-const EMOJI_ROWS: ReadonlyArray<ReadonlyArray<string>> = [
-  ['🦊', '🐨', '🐼', '🐸', '🦉'],
-  ['🦁', '🐺', '🐯', '🦋', '🐝'],
-  ['🐰', '🐙', '🐳', '🦔', '🐢'],
-  ['🦩', '🐧', '🦝', '🐬', '🦜'],
-  ['🦄', '🐘', '🦕', '🦖', '🦚'],
-  ['🐿️', '🦦', '🦥', '🦨', '🦎'],
-]
+export const AVATAR_IDS: ReadonlyArray<string> = Array.from({ length: 26 }, (_, i) => `av-${i + 1}`)
 
-export const AVATARS: ReadonlyArray<{ id: string; emoji: string; bg: BgColor }> =
-  EMOJI_ROWS.flatMap((row, rowIndex) =>
-    row.map((emoji, colIndex) => ({
-      id: `a${rowIndex * 5 + colIndex}`,
-      emoji,
-      bg: BG_COLORS[rowIndex % BG_COLORS.length],
-    })),
-  )
+export const ROSTER_SIZE = AVATAR_IDS.length
 
-export const ROSTER_SIZE = AVATARS.length
+export const DEFAULT_AVATAR_ID = 'av-1'
 
-export function avatarById(id: string): { id: string; emoji: string; bg: BgColor } | undefined {
-  return AVATARS.find((a) => a.id === id)
+export function isAvatarId(id: string): boolean {
+  return AVATAR_IDS.includes(id)
 }
 
-/** Deduplicated roster check — guards against copy/paste emoji collisions. */
-export const ROSTER_IS_UNIQUE =
-  new Set(AVATARS.map((a) => a.emoji)).size === ROSTER_SIZE
+export function avatarUrl(id: string): string {
+  return `${GUMMYGUM_AVATAR_BASE_URL}/${isAvatarId(id) ? id : DEFAULT_AVATAR_ID}.svg`
+}
+
+export function avatarLabel(id: string): string {
+  return isAvatarId(id) ? `Avatar ${id.slice(3)}` : 'Avatar'
+}
