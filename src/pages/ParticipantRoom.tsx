@@ -462,7 +462,7 @@ function ParticipantFinal({
         ))}
       </div>
       {ggSession && (
-        <button type="button" className="btn2 ghost" style={{ marginTop: 20 }} onClick={returnToGummyGum}>
+        <button type="button" className="btn2 ghost" style={{ marginTop: 20 }} onClick={() => returnToGummyGum()}>
           Back to GummyGum
         </button>
       )}

@@ -171,10 +171,71 @@ export async function reportGummyGumResult(report: Record<string, unknown>): Pro
 }
 
 // Player / guest return: safe navigation back to GummyGum without closing the host's room
-export function returnToGummyGum(): void {
+export function returnToGummyGum(hubUrl?: string): void {
   const session = getGummyGumSession()
-  const hub = session?.hubUrl || 'https://gummygum.app'
+  const hub = hubUrl || session?.hubUrl || 'https://gummygum.app'
   sessionStorage.removeItem(STORAGE_KEY)
   localStorage.removeItem(STORAGE_KEY)
   window.location.href = hub
+}
+
+const HUB_STATUS_POLL_MS = 15_000
+
+// The hub can't write to this experience's database, so a session ended from the hub is
+// detected by polling its status. A newer hosted session under the same PIN also means ours is over.
+export function watchHubSessionStatus({
+  pin,
+  hostedSessionId,
+  onEnded,
+}: {
+  pin: string
+  hostedSessionId: string
+  onEnded: () => void
+}): () => void {
+  let stopped = false
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  const schedule = () => {
+    if (timer) clearTimeout(timer)
+    timer = null
+    if (!stopped && !document.hidden) timer = setTimeout(check, HUB_STATUS_POLL_MS)
+  }
+
+  async function check() {
+    if (stopped) return
+    try {
+      const res = await fetch(`${API_URL}/api/gummygum/sessions/by-pin/${encodeURIComponent(pin)}`)
+      if (res.ok) {
+        const body = (await res.json()) as { success?: boolean; data?: { id?: string; status?: string } }
+        const data = body.success ? body.data : undefined
+        if (!stopped && data?.id && (data.id !== hostedSessionId || data.status === 'Ended')) {
+          stop()
+          onEnded()
+          return
+        }
+      }
+    } catch {
+      // Network errors never end a session.
+    }
+    schedule()
+  }
+
+  const onVisibility = () => {
+    if (document.hidden) {
+      if (timer) clearTimeout(timer)
+      timer = null
+    } else {
+      void check()
+    }
+  }
+
+  function stop() {
+    stopped = true
+    if (timer) clearTimeout(timer)
+    document.removeEventListener('visibilitychange', onVisibility)
+  }
+
+  document.addEventListener('visibilitychange', onVisibility)
+  void check()
+  return stop
 }

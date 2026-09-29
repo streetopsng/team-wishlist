@@ -37,6 +37,7 @@ export interface SessionMeta {
   source: string
   phaseChangedAt?: number
   abandoned?: boolean
+  ended?: boolean
 }
 
 export interface SessionSnapshot {
@@ -134,6 +135,7 @@ export function subscribeSession(
           source: String(metaRaw.source ?? 'standalone'),
           phaseChangedAt: Number(metaRaw.phaseChangedAt ?? 0),
           abandoned: Boolean(metaRaw.abandoned),
+          ended: Boolean(metaRaw.ended),
         },
         participants: hydrateParticipants(raw.participants),
         wishes: hydrateWishes(raw.wishes),
@@ -284,6 +286,10 @@ export function setPhase(code: string, hostKey: string, phase: Phase): Promise<v
 
 export function markSessionAbandoned(code: string, hostKey: string): Promise<void> {
   return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/meta/abandoned`), true))
+}
+
+export function markSessionEnded(code: string, hostKey: string): Promise<void> {
+  return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/meta/ended`), true))
 }
 
 export function setRevealIndex(code: string, hostKey: string, index: number): Promise<void> {

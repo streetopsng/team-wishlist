@@ -9,7 +9,7 @@ import {
   type Phase,
   type Wish,
 } from '@/lib/domain'
-import { applyAutoPromotion, saveCollective, setPhase, setRevealIndex } from '@/lib/session'
+import { applyAutoPromotion, markSessionEnded, saveCollective, setPhase, setRevealIndex } from '@/lib/session'
 import type { SessionSnapshot } from '@/lib/session'
 import { exportResults } from '@/lib/export'
 import { reportGummyGumCancel, reportGummyGumResult, returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
@@ -116,7 +116,8 @@ export function HostRoom({
                 onClick={async () => {
                   setShowCancelModal(false)
                   await reportGummyGumCancel()
-                  returnToGummyGum()
+                  await markSessionEnded(code, hostKey).catch(() => undefined)
+                  returnToGummyGum(ggSession?.hubUrl)
                 }}
               >
                 Exit to hub

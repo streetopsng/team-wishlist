@@ -6,11 +6,12 @@ import { HostRoom } from '@/pages/HostRoom'
 import { Join } from '@/pages/Join'
 import { Landing } from '@/pages/Landing'
 import { SessionExpiredModal } from '@/components/SessionExpiredModal'
+import { SessionEndedScreen } from '@/components/SessionEndedScreen'
 import { autoPromote, isLobbyIdleExpired, isSessionAbandoned } from '@/lib/domain'
 import { clearIdentity, findMe, loadGummyGumHostKey, loadIdentity, saveGummyGumHostKey, saveIdentity } from '@/lib/identity'
-import { applyAutoPromotion, createSession, markSessionAbandoned, registerPresence } from '@/lib/session'
+import { applyAutoPromotion, createSession, markSessionAbandoned, markSessionEnded, registerPresence } from '@/lib/session'
 import { useSession } from '@/hooks/useSession'
-import { gummyGumRoomCode, reportGummyGumCancel, resolveGummyGumLaunch, returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
+import { gummyGumRoomCode, reportGummyGumCancel, resolveGummyGumLaunch, returnToGummyGum, watchHubSessionStatus, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
 type Route =
   | { kind: 'landing' }
@@ -178,13 +179,35 @@ export default function App() {
     if (ggSession?.isHost) void reportGummyGumCancel()
   }, [isAbandoned, route, snapshot, ggSession])
 
+  const [hubEnded, setHubEnded] = useState(false)
+  const hubPin = ggSession?.roomCode ?? null
+  const hubHostedSessionId = ggSession?.hostedSessionId ?? null
+  // A COMPLETE room reports its own result, which also ends the hub session; keep the final screen.
+  const watchHub = Boolean(hubPin && hubHostedSessionId) && !hubEnded && !expiredContext && livePhase !== 'COMPLETE'
+  useEffect(() => {
+    if (!watchHub || !hubPin || !hubHostedSessionId) return undefined
+    return watchHubSessionStatus({ pin: hubPin, hostedSessionId: hubHostedSessionId, onEnded: () => setHubEnded(true) })
+  }, [watchHub, hubPin, hubHostedSessionId])
+
+  const isEnded = hubEnded || (Boolean(snapshot?.meta.ended) && livePhase !== 'COMPLETE')
+
+  // The session is already closed on the hub, so the host leaves without reporting cancel again.
+  const endHandledRef = useRef(false)
+  const hubUrl = ggSession?.hubUrl
+  useEffect(() => {
+    if (!isEnded || route.kind !== 'host' || endHandledRef.current) return
+    endHandledRef.current = true
+    const persist = snapshot?.meta.ended ? Promise.resolve() : markSessionEnded(route.code, route.hostKey)
+    void persist.catch(() => undefined).finally(() => returnToGummyGum(hubUrl))
+  }, [isEnded, route, snapshot, hubUrl])
+
   // Presence heartbeat for joined participants.
   const presencePid = route.kind === 'participant' && identity ? identity.pid : freshJoin?.pid
   const presenceCode = route.kind === 'participant' ? route.code : freshJoin?.code
   useEffect(() => {
-    if (presenceCode && presencePid && !expiredContext) return registerPresence(presenceCode, presencePid)
+    if (presenceCode && presencePid && !expiredContext && !isEnded) return registerPresence(presenceCode, presencePid)
     return undefined
-  }, [presenceCode, presencePid, expiredContext])
+  }, [presenceCode, presencePid, expiredContext, isEnded])
 
   // MATCHING -> PRIORITISATION auto-promotion (ADR 0007): the host client performs it.
   const promoteKeyRef = useRef<string | null>(null)
@@ -238,7 +261,7 @@ export default function App() {
       <div className="screen center-screen">
         <h2 className="section-title">Host access couldn&apos;t be restored</h2>
         <p className="section-sub">Return to GummyGum and relaunch this session as the host.</p>
-        <button type="button" className="btn2 orange" style={{ marginTop: 18 }} onClick={returnToGummyGum}>
+        <button type="button" className="btn2 orange" style={{ marginTop: 18 }} onClick={() => returnToGummyGum()}>
           Back to GummyGum
         </button>
       </div>
@@ -246,6 +269,10 @@ export default function App() {
   }
 
   if (ggResolvingHost) return <Splash text="Opening control room..." />
+
+  if (ggSession && isEnded && (route.kind === 'host' || route.kind === 'join' || route.kind === 'participant')) {
+    return <SessionEndedScreen isHost={route.kind === 'host'} hubUrl={ggSession.hubUrl} />
+  }
 
   if (route.kind === 'landing') return <Landing onHost={() => { navigate('/host/create'); setRoute({ kind: 'hostCreate' }) }} />
 
