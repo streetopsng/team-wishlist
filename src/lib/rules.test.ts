@@ -44,6 +44,21 @@ describe('RTDB rules contract (ADR 0004/0010 security invariants)', () => {
     }
   })
 
+  it('reads the claim from the top-level node and never matches a missing host key', () => {
+    const gated = [
+      session.meta['.write'],
+      session.wishes.$wid['.write'],
+      session.collectives.$cid['.write'],
+      session.reveal.index['.write'],
+    ]
+    for (const expr of gated) {
+      expect(expr).toContain("root.child('claims/' + $code)")
+      expect(expr).not.toContain("data.parent().child('claims/")
+      expect(expr).not.toContain("data.parent().parent().child('claims/")
+      expect(expr).toContain("root.child('hostKeys/' + $code).exists()")
+    }
+  })
+
   it('allows wish creation and claim-gated collectiveId-only updates', () => {
     const wishWrite = session.wishes.$wid['.write'] ?? ''
     expect(wishWrite).toContain('!data.exists()')

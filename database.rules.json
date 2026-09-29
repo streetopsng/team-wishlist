@@ -17,7 +17,7 @@
         ".read": true,
         ".write": "!data.exists()",
         "meta": {
-          ".write": "data.parent().child('claims/' + $code).val() === root.child('hostKeys/' + $code).val()",
+          ".write": "root.child('hostKeys/' + $code).exists() && root.child('claims/' + $code).val() === root.child('hostKeys/' + $code).val()",
           ".validate": "newData.hasChildren(['name', 'phase', 'createdAt', 'cap'])",
           "name": {
             ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80"
@@ -36,6 +36,15 @@
           },
           "source": {
             ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "phaseChangedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "abandoned": {
+            ".validate": "newData.isBoolean()"
+          },
+          "ended": {
+            ".validate": "newData.isBoolean()"
           }
         },
         "participants": {
@@ -64,14 +73,14 @@
         },
         "wishes": {
           "$wid": {
-            ".write": "!data.exists() || (data.parent().parent().child('claims/' + $code).val() === root.child('hostKeys/' + $code).val() && newData.child('text').val() === data.child('text').val() && newData.child('authorPid').val() === data.child('authorPid').val() && newData.child('avatarId').val() === data.child('avatarId').val() && newData.child('createdAt').val() === data.child('createdAt').val())",
+            ".write": "!data.exists() || (root.child('hostKeys/' + $code).exists() && root.child('claims/' + $code).val() === root.child('hostKeys/' + $code).val() && newData.child('text').val() === data.child('text').val() && newData.child('authorPid').val() === data.child('authorPid').val() && newData.child('avatarId').val() === data.child('avatarId').val() && newData.child('createdAt').val() === data.child('createdAt').val())",
             ".validate": "newData.hasChildren(['text', 'authorPid', 'avatarId', 'createdAt']) && newData.child('text').val().length > 0 && newData.child('text').val().length <= 90",
             "collectiveId": { ".validate": "newData.isString() || newData.val() === null" }
           }
         },
         "collectives": {
           "$cid": {
-            ".write": "!data.exists() || (data.parent().parent().child('claims/' + $code).val() === root.child('hostKeys/' + $code).val() && newData.child('title').val() === data.child('title').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('autoPromoted').val() === data.child('autoPromoted').val())",
+            ".write": "!data.exists() || (root.child('hostKeys/' + $code).exists() && root.child('claims/' + $code).val() === root.child('hostKeys/' + $code).val() && newData.child('title').val() === data.child('title').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('autoPromoted').val() === data.child('autoPromoted').val())",
             ".validate": "newData.hasChildren(['title', 'createdAt'])",
             "title": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 90" },
             "createdAt": { ".validate": "newData.isNumber()" },
@@ -80,7 +89,7 @@
         },
         "reveal": {
           "index": {
-            ".write": "data.parent().parent().child('claims/' + $code).val() === root.child('hostKeys/' + $code).val()",
+            ".write": "root.child('hostKeys/' + $code).exists() && root.child('claims/' + $code).val() === root.child('hostKeys/' + $code).val()",
             ".validate": "newData.isNumber()"
           }
         }
