@@ -2,7 +2,7 @@
 // load and reporting this experience's outcome back to the hub when the
 // launching player (the host) finishes their session.
 
-const API_URL = import.meta.env.VITE_GUMMYGUM_API_URL || 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_GUMMYGUM_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://paige-server.onrender.com')
 const STORAGE_KEY = 'gummygum_launch_session'
 
 export interface GummyGumPlayer {
@@ -18,6 +18,7 @@ export interface GummyGumLaunchSession {
   player: GummyGumPlayer | null
   reportToken: string
   roomCode: string | null
+  hostedSessionId?: string | null
   isHost: boolean
   invitedCount?: number | null
   config: Record<string, unknown> | null
@@ -40,6 +41,14 @@ interface VerifyLaunchResponse {
     config?: Record<string, unknown> | null
     hubUrl?: string
   }
+}
+
+// The hub reuses a PIN when a session is re-run, and sessions/{code} and hostKeys/{code} are
+// write-once (database.rules.json), so each hosted session gets its own room under that PIN.
+export function gummyGumRoomCode(session: GummyGumLaunchSession | null): string | null {
+  if (!session?.roomCode) return null
+  const hosted = (session.hostedSessionId ?? '').replace(/[^A-Za-z0-9_-]/g, '')
+  return hosted ? `${session.roomCode}-${hosted}` : session.roomCode
 }
 
 export function getGummyGumSession(): GummyGumLaunchSession | null {
@@ -107,6 +116,7 @@ export async function resolveGummyGumLaunch(): Promise<GummyGumLaunchSession | n
     player: body.data.player,
     reportToken: body.data.reportToken,
     roomCode: body.data.roomCode ?? null,
+    hostedSessionId: params.get('sessionId') || null,
     isHost: Boolean(body.data.isHost),
     invitedCount: body.data.invitedCount ?? null,
     config: body.data.config ?? null,
