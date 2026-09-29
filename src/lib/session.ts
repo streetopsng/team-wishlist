@@ -14,6 +14,7 @@ import {
   ref,
   remove,
   runTransaction,
+  serverTimestamp,
   set,
   update,
 } from 'firebase/database'
@@ -34,6 +35,8 @@ export interface SessionMeta {
   cap: number
   invitedCount: number
   source: string
+  phaseChangedAt?: number
+  abandoned?: boolean
 }
 
 export interface SessionSnapshot {
@@ -82,6 +85,7 @@ export function hydrateParticipants(raw: unknown): Participant[] {
       doneAllocating: Boolean(p.doneAllocating),
       doneResults: Boolean(p.doneResults),
       tokens: (p.tokens as Record<string, number> | undefined) ?? {},
+      lastSeen: Number(p.lastSeen ?? 0),
     })
   }
   return out
@@ -128,6 +132,8 @@ export function subscribeSession(
           cap: Number(metaRaw.cap ?? 30),
           invitedCount: Number(metaRaw.invitedCount ?? 0),
           source: String(metaRaw.source ?? 'standalone'),
+          phaseChangedAt: Number(metaRaw.phaseChangedAt ?? 0),
+          abandoned: Boolean(metaRaw.abandoned),
         },
         participants: hydrateParticipants(raw.participants),
         wishes: hydrateWishes(raw.wishes),
@@ -271,7 +277,13 @@ export function saveCollective(
 }
 
 export function setPhase(code: string, hostKey: string, phase: Phase): Promise<void> {
-  return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/meta/phase`), phase))
+  return withHost(code, hostKey, () =>
+    update(ref(db, `sessions/${code}/meta`), { phase, phaseChangedAt: Date.now() }),
+  )
+}
+
+export function markSessionAbandoned(code: string, hostKey: string): Promise<void> {
+  return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/meta/abandoned`), true))
 }
 
 export function setRevealIndex(code: string, hostKey: string, index: number): Promise<void> {
@@ -326,14 +338,16 @@ export async function setTokens(
  * when the effect re-runs, so registrations don't pile up.
  */
 export function registerPresence(code: string, pid: string): () => void {
+  const participantRef = ref(db, `sessions/${code}/participants/${pid}`)
   const statusRef = ref(db, `sessions/${code}/participants/${pid}/online`)
   const conn = ref(db, '.info/connected')
   let cancelDisconnect: (() => void) | null = null
   const unsub = onValue(conn, (snap) => {
     if (snap.val() === true) {
       cancelDisconnect?.()
-      const d = onDisconnect(statusRef)
-      void d.set(false).catch(() => undefined)
+      const d = onDisconnect(participantRef)
+      // lastSeen lets a returning client tell an abandoned room from a live one.
+      void d.update({ online: false, lastSeen: serverTimestamp() }).catch(() => undefined)
       cancelDisconnect = () => void d.cancel().catch(() => undefined)
       set(statusRef, true).catch(() => undefined)
     }
@@ -341,7 +355,7 @@ export function registerPresence(code: string, pid: string): () => void {
   return () => {
     unsub()
     cancelDisconnect?.()
-    set(statusRef, false).catch(() => undefined)
+    update(participantRef, { online: false, lastSeen: serverTimestamp() }).catch(() => undefined)
   }
 }
 

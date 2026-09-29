@@ -5,11 +5,12 @@ import { HostKeys } from '@/pages/HostKeys'
 import { HostRoom } from '@/pages/HostRoom'
 import { Join } from '@/pages/Join'
 import { Landing } from '@/pages/Landing'
-import { autoPromote } from '@/lib/domain'
+import { SessionExpiredModal } from '@/components/SessionExpiredModal'
+import { autoPromote, isLobbyIdleExpired, isSessionAbandoned } from '@/lib/domain'
 import { clearIdentity, findMe, loadGummyGumHostKey, loadIdentity, saveGummyGumHostKey, saveIdentity } from '@/lib/identity'
-import { applyAutoPromotion, createSession, registerPresence } from '@/lib/session'
+import { applyAutoPromotion, createSession, markSessionAbandoned, registerPresence } from '@/lib/session'
 import { useSession } from '@/hooks/useSession'
-import { resolveGummyGumLaunch, returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
+import { reportGummyGumCancel, resolveGummyGumLaunch, returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
 type Route =
   | { kind: 'landing' }
@@ -134,13 +135,55 @@ export default function App() {
       })
   }, [ggResolvingHost, ggSession, loading, snapshot])
 
+  const [abandonedOnLoad, setAbandonedOnLoad] = useState(false)
+  const abandonCheckedRef = useRef<string | null>(null)
+  // Evaluated once per room on first load, so live presence from this client can't mask abandonment.
+  useEffect(() => {
+    if (!snapshot || !code || abandonCheckedRef.current === code) return
+    abandonCheckedRef.current = code
+    const activity = {
+      phase: snapshot.meta.phase,
+      createdAt: snapshot.meta.createdAt,
+      phaseChangedAt: snapshot.meta.phaseChangedAt,
+      participants: snapshot.participants,
+      wishes: snapshot.wishes,
+      collectives: snapshot.collectives,
+    }
+    if (isSessionAbandoned(activity, pid, Date.now())) setAbandonedOnLoad(true)
+  }, [snapshot, code, pid])
+
+  const [lobbyExpired, setLobbyExpired] = useState(false)
+  const livePhase = snapshot?.meta.phase
+  const createdAt = snapshot?.meta.createdAt ?? 0
+  useEffect(() => {
+    if (livePhase !== 'SETUP') return undefined
+    const check = () => {
+      if (isLobbyIdleExpired(livePhase, createdAt, Date.now())) setLobbyExpired(true)
+    }
+    check()
+    const timer = setInterval(check, 10_000)
+    return () => clearInterval(timer)
+  }, [livePhase, createdAt])
+
+  const isAbandoned = abandonedOnLoad || Boolean(snapshot?.meta.abandoned)
+  const expiredContext: 'lobby' | 'game' | null = isAbandoned ? 'game' : lobbyExpired ? 'lobby' : null
+
+  // Host persists the abandoned flag for everyone and reports it to GummyGum as cancelled, once.
+  const abandonHandledRef = useRef(false)
+  useEffect(() => {
+    if (!isAbandoned || route.kind !== 'host' || abandonHandledRef.current) return
+    abandonHandledRef.current = true
+    if (!snapshot?.meta.abandoned) void markSessionAbandoned(route.code, route.hostKey).catch(() => undefined)
+    if (ggSession?.isHost) void reportGummyGumCancel()
+  }, [isAbandoned, route, snapshot, ggSession])
+
   // Presence heartbeat for joined participants.
   const presencePid = route.kind === 'participant' && identity ? identity.pid : freshJoin?.pid
   const presenceCode = route.kind === 'participant' ? route.code : freshJoin?.code
   useEffect(() => {
-    if (presenceCode && presencePid) return registerPresence(presenceCode, presencePid)
+    if (presenceCode && presencePid && !expiredContext) return registerPresence(presenceCode, presencePid)
     return undefined
-  }, [presenceCode, presencePid])
+  }, [presenceCode, presencePid, expiredContext])
 
   // MATCHING -> PRIORITISATION auto-promotion (ADR 0007): the host client performs it.
   const promoteKeyRef = useRef<string | null>(null)
@@ -176,6 +219,10 @@ export default function App() {
   }, [ggSession])
 
   const me = useMemo(() => findMe(snapshot, pid), [snapshot, pid])
+
+  const expiredModal = expiredContext ? (
+    <SessionExpiredModal isHost={route.kind === 'host'} context={expiredContext} hubUrl={ggSession?.hubUrl ?? null} />
+  ) : null
 
   if (import.meta.env.DEV) {
     // surface RTDB errors visibly during development
@@ -223,7 +270,12 @@ export default function App() {
   if (route.kind === 'host') {
     if (loading) return <Splash text="Opening control room…" />
     if (!snapshot) return <Splash text={error ?? 'Session not found — check the link.'} />
-    return <HostRoom code={route.code} hostKey={route.hostKey} snapshot={snapshot} ggSession={ggSession} />
+    return (
+      <>
+        <HostRoom code={route.code} hostKey={route.hostKey} snapshot={snapshot} ggSession={ggSession} />
+        {expiredModal}
+      </>
+    )
   }
 
   // Participant routes: join first if no identity for this session yet.
@@ -235,14 +287,22 @@ export default function App() {
     }
     if (!me) {
       return (
-        <Join
-          code={route.code}
-          claimedAvatarIds={snapshot.participants.map((p) => p.avatarId)}
-          onJoined={(joinedPid, avatarId) => claimJoin(route.code, joinedPid, avatarId)}
-        />
+        <>
+          <Join
+            code={route.code}
+            claimedAvatarIds={snapshot.participants.map((p) => p.avatarId)}
+            onJoined={(joinedPid, avatarId) => claimJoin(route.code, joinedPid, avatarId)}
+          />
+          {expiredModal}
+        </>
       )
     }
-    return <ParticipantRoom code={route.code} snapshot={snapshot} me={me} ggSession={ggSession} />
+    return (
+      <>
+        <ParticipantRoom code={route.code} snapshot={snapshot} me={me} ggSession={ggSession} />
+        {expiredModal}
+      </>
+    )
   }
 
   void clearIdentity // re-exported for future "leave room" affordance
