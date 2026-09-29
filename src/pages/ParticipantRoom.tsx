@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AvatarChip, CollectiveCard, IdeaWall, TokenDots } from '@/components/ui'
+import { AvatarChip, CollectiveCard, Icon, IdeaWall, TokenDots } from '@/components/ui'
 import {
   MAX_WISHES,
   TOKENS_PER_PARTICIPANT,
@@ -64,8 +64,12 @@ export function ParticipantRoom({
     <>
       {phase === 'SETUP' && (
         <div className="screen center-screen">
-          <h2 className="section-title">Getting ready…</h2>
-          <p className="section-sub">Your host will open wishes shortly.</p>
+          <AvatarChip avatarId={me.avatarId} size="lg" />
+          <h2 className="section-title" style={{ marginTop: 18 }}>You&apos;re in</h2>
+          <p className="section-sub">
+            Your host will open wishes shortly. {participants.length}{' '}
+            {participants.length === 1 ? 'person is' : 'people are'} in the room.
+          </p>
         </div>
       )}
 
@@ -217,7 +221,7 @@ function ParticipantWishing({
       <div className="your-wishes" aria-label="Your wishes so far">
         {myWishes.map((w, i) => (
           <div key={i} className="your-wish-row">
-            <span className="check">✓</span> {w.text}
+            <span className="check"><Icon name="check" size={14} /></span> {w.text}
           </div>
         ))}
       </div>
@@ -337,7 +341,7 @@ function RecapGate({
       </div>
       <div className="wishing-footer">
         <button type="button" className="btn2 orange full" onClick={() => markDone(code, me, 'recapSeen')}>
-          What matters most? →
+          What matters most?
         </button>
       </div>
     </div>
@@ -462,7 +466,7 @@ function ParticipantFinal({
         ))}
       </div>
       {ggSession && (
-        <button type="button" className="btn2 ghost" style={{ marginTop: 20 }} onClick={returnToGummyGum}>
+        <button type="button" className="btn2 ghost" style={{ marginTop: 20 }} onClick={() => returnToGummyGum()}>
           Back to GummyGum
         </button>
       )}

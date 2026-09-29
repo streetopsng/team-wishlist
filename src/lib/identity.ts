@@ -45,6 +45,10 @@ export function saveGummyGumHostKey(code: string, hostKey: string): void {
   localStorage.setItem(HOST_KEY_PREFIX + code, hostKey)
 }
 
+export function clearGummyGumHostKey(code: string): void {
+  localStorage.removeItem(HOST_KEY_PREFIX + code)
+}
+
 export function loadGummyGumHostKey(code: string): string | null {
   return localStorage.getItem(HOST_KEY_PREFIX + code)
 }

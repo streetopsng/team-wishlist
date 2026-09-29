@@ -37,6 +37,7 @@ export interface SessionMeta {
   source: string
   phaseChangedAt?: number
   abandoned?: boolean
+  ended?: boolean
 }
 
 export interface SessionSnapshot {
@@ -129,11 +130,12 @@ export function subscribeSession(
           name: String(metaRaw.name ?? ''),
           phase: (metaRaw.phase ?? 'SETUP') as Phase,
           createdAt: Number(metaRaw.createdAt ?? 0),
-          cap: Number(metaRaw.cap ?? 30),
+          cap: Number(metaRaw.cap ?? ROSTER_SIZE),
           invitedCount: Number(metaRaw.invitedCount ?? 0),
           source: String(metaRaw.source ?? 'standalone'),
           phaseChangedAt: Number(metaRaw.phaseChangedAt ?? 0),
           abandoned: Boolean(metaRaw.abandoned),
+          ended: Boolean(metaRaw.ended),
         },
         participants: hydrateParticipants(raw.participants),
         wishes: hydrateWishes(raw.wishes),
@@ -174,11 +176,12 @@ export async function createSession(
   name: string,
   invitedCount: number,
   presetCode?: string,
+  presetHostKey?: string,
 ): Promise<{ code: string; hostKey: string }> {
   const attempts = presetCode ? 1 : 5
   for (let attempt = 0; attempt < attempts; attempt++) {
     const code = presetCode ?? generateSessionCode()
-    const hostKey = generateHostKey()
+    const hostKey = presetHostKey ?? generateHostKey()
     const meta: SessionMeta = {
       name,
       phase: 'SETUP',
@@ -203,12 +206,24 @@ export async function createSession(
   throw new Error('Could not generate a unique session code — try again')
 }
 
+/**
+ * A GummyGum invitee's pid is derived from their invite email so a rejoin from any
+ * device lands on the same participant, while the room only ever sees an opaque hash.
+ */
+export async function invitePid(code: string, email: string | null | undefined): Promise<string | null> {
+  const normalized = (email ?? '').trim().toLowerCase()
+  if (!normalized || !globalThis.crypto?.subtle) return null
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`tw:${code}:${normalized}`))
+  return Array.from(new Uint8Array(digest).slice(0, 8), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /** Participant claims an avatar transactionally (ADR 0003/0005). */
 export async function joinSession(
   code: string,
   avatarId: string,
+  presetPid?: string | null,
 ): Promise<{ pid: string }> {
-  const pid = generatePid()
+  const pid = presetPid || generatePid()
   const participantRecord: Omit<Participant, 'pid'> = {
     avatarId,
     joinedAt: Date.now(),
@@ -284,6 +299,10 @@ export function setPhase(code: string, hostKey: string, phase: Phase): Promise<v
 
 export function markSessionAbandoned(code: string, hostKey: string): Promise<void> {
   return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/meta/abandoned`), true))
+}
+
+export function markSessionEnded(code: string, hostKey: string): Promise<void> {
+  return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/meta/ended`), true))
 }
 
 export function setRevealIndex(code: string, hostKey: string, index: number): Promise<void> {

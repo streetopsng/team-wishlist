@@ -206,9 +206,9 @@ describe('auto-promotion (ADR 0007)', () => {
 describe('room capacity (ADR 0005)', () => {
   it('is full only when every roster avatar is claimed', () => {
     expect(isRoomFull([])).toBe(false)
-    const ids = Array.from({ length: ROSTER_SIZE - 1 }, (_, i) => `a${i}`)
+    const ids = Array.from({ length: ROSTER_SIZE - 1 }, (_, i) => `av-${i + 1}`)
     expect(isRoomFull(ids)).toBe(false)
-    expect(isRoomFull([...ids, 'a29'])).toBe(true)
+    expect(isRoomFull([...ids, `av-${ROSTER_SIZE}`])).toBe(true)
   })
 })
 

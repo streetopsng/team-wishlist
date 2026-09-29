@@ -1,27 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { AVATARS, BG_COLORS, ROSTER_IS_UNIQUE, ROSTER_SIZE, avatarById } from './roster'
+import { AVATAR_IDS, ROSTER_SIZE, avatarUrl, isAvatarId } from './roster'
 
 describe('avatar roster', () => {
-  it('has exactly 30 avatars (ADR 0005)', () => {
-    expect(ROSTER_SIZE).toBe(30)
-    expect(AVATARS).toHaveLength(30)
+  it('is the 26-avatar GummyGum hub set (ADR 0005)', () => {
+    expect(ROSTER_SIZE).toBe(26)
+    expect(new Set(AVATAR_IDS).size).toBe(26)
+    expect(AVATAR_IDS[0]).toBe('av-1')
+    expect(AVATAR_IDS[25]).toBe('av-26')
   })
 
-  it('contains no duplicate emojis at all — the avatar is the identity (ADR 0003)', () => {
-    expect(ROSTER_IS_UNIQUE).toBe(true)
+  it('ids fit the rules limit on avatarId length', () => {
+    for (const id of AVATAR_IDS) expect(id.length).toBeLessThanOrEqual(8)
   })
 
-  it('uses only palette colors', () => {
-    for (const a of AVATARS) expect(BG_COLORS).toContain(a.bg)
-  })
-
-  it('resolves avatars by id', () => {
-    expect(avatarById('a0')).toBeDefined()
-    expect(avatarById('a29')).toBeDefined()
-    expect(avatarById('a30')).toBeUndefined()
-  })
-
-  it('has non-empty emoji strings', () => {
-    for (const a of AVATARS) expect(a.emoji.length).toBeGreaterThan(0)
+  it('resolves hub URLs and falls back for unknown ids', () => {
+    expect(isAvatarId('av-26')).toBe(true)
+    expect(isAvatarId('av-27')).toBe(false)
+    expect(avatarUrl('av-7')).toBe('https://gummygum.app/avatars/av-7.svg')
+    expect(avatarUrl('a3')).toBe('https://gummygum.app/avatars/av-1.svg')
   })
 })
