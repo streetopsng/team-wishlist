@@ -74,6 +74,8 @@ export interface Participant {
   doneResults: boolean
   /** Priority tokens per collective wish id (ADR 0008). */
   tokens: Record<string, number>
+  /** Server time this participant last disconnected. */
+  lastSeen?: number
 }
 
 /** A rank entry derived on read — never stored (ADR 0009). */
@@ -173,4 +175,35 @@ export function autoPromote(
 /** True when every avatar in the roster is claimed — the room is full (ADR 0005). */
 export function isRoomFull(claimedAvatarIds: string[]): boolean {
   return new Set(claimedAvatarIds).size >= ROSTER_SIZE
+}
+
+export const LOBBY_IDLE_MS = 20 * 60 * 1000
+/** Hours, not the lobby's 20 min: a slow live session must never be cut off. */
+export const ABANDON_THRESHOLD_MS = 3 * 60 * 60 * 1000
+
+export function isLobbyIdleExpired(phase: Phase, createdAt: number, now: number): boolean {
+  return phase === 'SETUP' && createdAt > 0 && now - createdAt >= LOBBY_IDLE_MS
+}
+
+export interface SessionActivity {
+  phase: Phase
+  createdAt: number
+  phaseChangedAt?: number
+  participants: Participant[]
+  wishes: Wish[]
+  collectives: CollectiveWish[]
+}
+
+/** Mid-session (past SETUP, not COMPLETE) with nobody else online and no writes for ABANDON_THRESHOLD_MS. */
+export function isSessionAbandoned(s: SessionActivity, selfPid: string | null, now: number): boolean {
+  if (s.phase === 'SETUP' || s.phase === 'COMPLETE') return false
+  if (s.participants.some((p) => p.online && p.pid !== selfPid)) return false
+  const last = Math.max(
+    s.createdAt,
+    s.phaseChangedAt ?? 0,
+    ...s.participants.map((p) => Math.max(p.joinedAt, p.lastSeen ?? 0)),
+    ...s.wishes.map((w) => w.createdAt),
+    ...s.collectives.map((c) => c.createdAt),
+  )
+  return last > 0 && now - last >= ABANDON_THRESHOLD_MS
 }

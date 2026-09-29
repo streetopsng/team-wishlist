@@ -14,6 +14,7 @@ import {
   ref,
   remove,
   runTransaction,
+  serverTimestamp,
   set,
   update,
 } from 'firebase/database'
@@ -34,6 +35,8 @@ export interface SessionMeta {
   cap: number
   invitedCount: number
   source: string
+  phaseChangedAt?: number
+  abandoned?: boolean
 }
 
 export interface SessionSnapshot {
@@ -82,6 +85,7 @@ export function hydrateParticipants(raw: unknown): Participant[] {
       doneAllocating: Boolean(p.doneAllocating),
       doneResults: Boolean(p.doneResults),
       tokens: (p.tokens as Record<string, number> | undefined) ?? {},
+      lastSeen: Number(p.lastSeen ?? 0),
     })
   }
   return out
@@ -128,6 +132,8 @@ export function subscribeSession(
           cap: Number(metaRaw.cap ?? 30),
           invitedCount: Number(metaRaw.invitedCount ?? 0),
           source: String(metaRaw.source ?? 'standalone'),
+          phaseChangedAt: Number(metaRaw.phaseChangedAt ?? 0),
+          abandoned: Boolean(metaRaw.abandoned),
         },
         participants: hydrateParticipants(raw.participants),
         wishes: hydrateWishes(raw.wishes),
@@ -162,13 +168,16 @@ export function generatePid(): string {
 /**
  * Create a session atomically. Refuses if the code somehow already exists.
  * Returns the host key so the caller can build the control URL.
+ * `presetCode` pins the session to the GummyGum hub's room code (ADR 0002).
  */
 export async function createSession(
   name: string,
   invitedCount: number,
+  presetCode?: string,
 ): Promise<{ code: string; hostKey: string }> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = generateSessionCode()
+  const attempts = presetCode ? 1 : 5
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const code = presetCode ?? generateSessionCode()
     const hostKey = generateHostKey()
     const meta: SessionMeta = {
       name,
@@ -176,7 +185,7 @@ export async function createSession(
       createdAt: Date.now(),
       cap: ROSTER_SIZE, // ADR 0005: cap = roster size, single source of truth
       invitedCount,
-      source: 'standalone', // ADR 0002: GummyGum-shaped seam
+      source: presetCode ? 'gummygum' : 'standalone', // ADR 0002: GummyGum-shaped seam
     }
     const created = await runTransaction(sessionRef(code), (current) => {
       if (current !== null) return undefined // code taken — abort, retry with a new one
@@ -189,6 +198,7 @@ export async function createSession(
       await set(ref(db, `hostKeys/${code}`), hostKey)
       return { code, hostKey }
     }
+    if (presetCode) throw new Error('A session already exists for this room')
   }
   throw new Error('Could not generate a unique session code — try again')
 }
@@ -267,7 +277,13 @@ export function saveCollective(
 }
 
 export function setPhase(code: string, hostKey: string, phase: Phase): Promise<void> {
-  return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/meta/phase`), phase))
+  return withHost(code, hostKey, () =>
+    update(ref(db, `sessions/${code}/meta`), { phase, phaseChangedAt: Date.now() }),
+  )
+}
+
+export function markSessionAbandoned(code: string, hostKey: string): Promise<void> {
+  return withHost(code, hostKey, () => set(ref(db, `sessions/${code}/meta/abandoned`), true))
 }
 
 export function setRevealIndex(code: string, hostKey: string, index: number): Promise<void> {
@@ -322,14 +338,16 @@ export async function setTokens(
  * when the effect re-runs, so registrations don't pile up.
  */
 export function registerPresence(code: string, pid: string): () => void {
+  const participantRef = ref(db, `sessions/${code}/participants/${pid}`)
   const statusRef = ref(db, `sessions/${code}/participants/${pid}/online`)
   const conn = ref(db, '.info/connected')
   let cancelDisconnect: (() => void) | null = null
   const unsub = onValue(conn, (snap) => {
     if (snap.val() === true) {
       cancelDisconnect?.()
-      const d = onDisconnect(statusRef)
-      void d.set(false).catch(() => undefined)
+      const d = onDisconnect(participantRef)
+      // lastSeen lets a returning client tell an abandoned room from a live one.
+      void d.update({ online: false, lastSeen: serverTimestamp() }).catch(() => undefined)
       cancelDisconnect = () => void d.cancel().catch(() => undefined)
       set(statusRef, true).catch(() => undefined)
     }
@@ -337,7 +355,7 @@ export function registerPresence(code: string, pid: string): () => void {
   return () => {
     unsub()
     cancelDisconnect?.()
-    set(statusRef, false).catch(() => undefined)
+    update(participantRef, { online: false, lastSeen: serverTimestamp() }).catch(() => undefined)
   }
 }
 

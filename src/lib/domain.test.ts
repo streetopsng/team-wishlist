@@ -9,8 +9,12 @@ import {
   canAddToken,
   canSubmitWish,
   computeRanking,
+  ABANDON_THRESHOLD_MS,
+  LOBBY_IDLE_MS,
   isForwardTransition,
+  isLobbyIdleExpired,
   isRevealComplete,
+  isSessionAbandoned,
   isRoomFull,
   isValidWishText,
   revealOrder,
@@ -205,5 +209,32 @@ describe('room capacity (ADR 0005)', () => {
     const ids = Array.from({ length: ROSTER_SIZE - 1 }, (_, i) => `a${i}`)
     expect(isRoomFull(ids)).toBe(false)
     expect(isRoomFull([...ids, 'a29'])).toBe(true)
+  })
+})
+
+describe('session expiry', () => {
+  const now = 10 * ABANDON_THRESHOLD_MS
+  const base = { createdAt: 1, participants: [], wishes: [], collectives: [] }
+
+  it('expires only a SETUP lobby idle for 20 minutes', () => {
+    expect(isLobbyIdleExpired('SETUP', now - LOBBY_IDLE_MS, now)).toBe(true)
+    expect(isLobbyIdleExpired('SETUP', now - LOBBY_IDLE_MS + 1, now)).toBe(false)
+    expect(isLobbyIdleExpired('WISHING', 1, now)).toBe(false)
+  })
+
+  it('flags a stale mid-session room but never SETUP or COMPLETE', () => {
+    expect(isSessionAbandoned({ ...base, phase: 'MATCHING' }, null, now)).toBe(true)
+    expect(isSessionAbandoned({ ...base, phase: 'SETUP' }, null, now)).toBe(false)
+    expect(isSessionAbandoned({ ...base, phase: 'COMPLETE' }, null, now)).toBe(false)
+  })
+
+  it('is not abandoned while anyone else is online or activity is recent', () => {
+    const other = { ...participantWith({}), pid: 'p2', online: true }
+    const self = { ...participantWith({}), pid: 'me', online: true }
+    expect(isSessionAbandoned({ ...base, phase: 'WISHING', participants: [other] }, 'me', now)).toBe(false)
+    expect(isSessionAbandoned({ ...base, phase: 'WISHING', participants: [self] }, 'me', now)).toBe(true)
+    const recent = { ...participantWith({}), online: false, lastSeen: now - 1000 }
+    expect(isSessionAbandoned({ ...base, phase: 'WISHING', participants: [recent] }, null, now)).toBe(false)
+    expect(isSessionAbandoned({ ...base, phase: 'WISHING', phaseChangedAt: now - 1000 }, null, now)).toBe(false)
   })
 })

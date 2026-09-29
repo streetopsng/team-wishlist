@@ -15,6 +15,7 @@ import {
 } from '@/lib/domain'
 import { markDone, setTokens, submitWish } from '@/lib/session'
 import type { SessionSnapshot } from '@/lib/session'
+import { returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
 function WaitingRoom({
   headline,
@@ -45,10 +46,12 @@ export function ParticipantRoom({
   code,
   snapshot,
   me,
+  ggSession,
 }: {
   code: string
   snapshot: SessionSnapshot
   me: Participant
+  ggSession: GummyGumLaunchSession | null
 }) {
   const phase = snapshot.meta.phase
   const wishes = snapshot.wishes
@@ -128,11 +131,11 @@ export function ParticipantRoom({
       )}
 
       {phase === 'RESULTS' && (
-        <ParticipantResults code={code} snapshot={snapshot} me={me} collectives={collectives} participants={participants} />
+        <ParticipantResults code={code} snapshot={snapshot} me={me} collectives={collectives} participants={participants} ggSession={ggSession} />
       )}
 
       {phase === 'COMPLETE' && (
-        <ParticipantFinal collectives={collectives} participants={participants} />
+        <ParticipantFinal collectives={collectives} participants={participants} ggSession={ggSession} />
       )}
     </>
   )
@@ -347,12 +350,14 @@ function ParticipantResults({
   me,
   collectives,
   participants,
+  ggSession,
 }: {
   code: string
   snapshot: SessionSnapshot
   me: Participant
   collectives: CollectiveWish[]
   participants: Participant[]
+  ggSession: GummyGumLaunchSession | null
 }) {
   const ranking = useMemo(() => computeRanking(collectives, participants), [collectives, participants])
   const idx = snapshot.revealIndex
@@ -362,7 +367,7 @@ function ParticipantResults({
   // The finale is shown only after THIS participant acknowledges the full reveal
   // (ADR 0009): everyone watches #1 land, then continues on their own beat.
   if (me.doneResults) {
-    return <ParticipantFinal collectives={collectives} participants={participants} />
+    return <ParticipantFinal collectives={collectives} participants={participants} ggSession={ggSession} />
   }
 
   const current = idx >= 0 ? ranking[n - 1 - idx] : null
@@ -426,9 +431,11 @@ function ParticipantResults({
 function ParticipantFinal({
   collectives,
   participants,
+  ggSession,
 }: {
   collectives: CollectiveWish[]
   participants: Participant[]
+  ggSession: GummyGumLaunchSession | null
 }) {
   const ranking = computeRanking(collectives, participants)
   const list = ranking.length > 0 ? ranking.map((r) => r.collective) : collectives
@@ -454,6 +461,11 @@ function ParticipantFinal({
           </div>
         ))}
       </div>
+      {ggSession && (
+        <button type="button" className="btn2 ghost" style={{ marginTop: 20 }} onClick={returnToGummyGum}>
+          Back to GummyGum
+        </button>
+      )}
     </div>
   )
 }

@@ -38,6 +38,17 @@ export function clearIdentity(code: string): void {
   localStorage.removeItem(KEY_PREFIX + code)
 }
 
+// Hub-launched hosts never see the host link, so this is the only copy of the key (ADR 0010).
+const HOST_KEY_PREFIX = 'tw-gg-hostkey:'
+
+export function saveGummyGumHostKey(code: string, hostKey: string): void {
+  localStorage.setItem(HOST_KEY_PREFIX + code, hostKey)
+}
+
+export function loadGummyGumHostKey(code: string): string | null {
+  return localStorage.getItem(HOST_KEY_PREFIX + code)
+}
+
 /** Look up a participant in a hydrated session snapshot by pid. */
 export function findMe(
   snapshot: { participants: Participant[] } | null,
