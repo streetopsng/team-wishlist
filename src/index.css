@@ -347,3 +347,14 @@ textarea,input{ font-family:'Poppins',sans-serif; }
 }
 
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+
+.intro-panel{ max-width:440px; max-height:90vh; overflow-y:auto; border:2.5px solid var(--line); box-shadow:6px 6px 0 var(--line); }
+.intro-head{ text-align:center; }
+.intro-title{ font-size:24px; margin:12px 0 6px; }
+.intro-body{ margin-bottom:18px; }
+.intro-steps{ list-style:none; margin:0 0 20px; padding:0; display:flex; flex-direction:column; gap:10px; }
+.intro-step{ display:flex; align-items:flex-start; gap:12px; padding:12px 14px; background:var(--bg); border:1.5px solid var(--hairline); border-radius:14px; }
+.intro-step-num{ width:30px; height:30px; flex-shrink:0; border-radius:10px; border:2px solid var(--line); background:var(--orange-tint); color:var(--orange-deep); font-weight:800; font-size:14px; display:flex; align-items:center; justify-content:center; }
+.intro-step-title{ font-weight:700; font-size:14px; color:var(--ink); }
+.intro-step-body{ font-size:12.5px; color:var(--muted); line-height:1.45; margin-top:2px; }
+.intro-cta{ display:flex; align-items:center; justify-content:center; gap:8px; }

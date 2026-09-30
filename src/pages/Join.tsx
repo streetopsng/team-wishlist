@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AvatarChip, Icon } from '@/components/ui'
+import { IntroModal } from '@/components/IntroModal'
 import { AVATAR_IDS, avatarLabel, avatarUrl } from '@/lib/roster'
 import { joinSession } from '@/lib/session'
 
@@ -19,6 +20,7 @@ export function Join({
   const [picked, setPicked] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showIntro, setShowIntro] = useState(false)
 
   const claimed = new Set(claimedAvatarIds)
   const full = AVATAR_IDS.every((id) => claimed.has(id))
@@ -97,7 +99,7 @@ export function Join({
               type="button"
               className="btn2 orange sticky-cta-btn"
               disabled={!pickedAvailable || busy}
-              onClick={confirm}
+              onClick={() => setShowIntro(true)}
             >
               {busy ? 'Joining...' : 'Enter the room'}
               <Icon name="arrowRight" size={16} />
@@ -105,6 +107,16 @@ export function Join({
           </div>
           <p className="sticky-cta-hint">{pickedAvailable ? 'Looking good.' : 'Pick an avatar to continue.'}</p>
         </div>
+      )}
+
+      {showIntro && (
+        <IntroModal
+          playerName={playerName}
+          onConfirm={() => {
+            setShowIntro(false)
+            void confirm()
+          }}
+        />
       )}
     </div>
   )
