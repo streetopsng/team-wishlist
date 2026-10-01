@@ -37,6 +37,8 @@ const ADVANCE_LABELS: Partial<Record<Phase, string>> = {
   COMPLETE: 'Finish session',
 }
 
+const MIN_PARTICIPANTS = 2
+
 const STEPS: Array<{ label: string; phases: Phase[] }> = [
   { label: 'Lobby', phases: ['SETUP'] },
   { label: 'Wishing', phases: ['WISHING', 'WAITING'] },
@@ -120,7 +122,9 @@ export function HostRoom({
   let secondary: ReactNode = null
 
   if (phase === 'SETUP') {
-    status = joined === 0 ? 'Waiting for people to join' : `${joined} ${joined === 1 ? 'person' : 'people'} in the room`
+    status = joined < MIN_PARTICIPANTS
+      ? `Waiting for at least ${MIN_PARTICIPANTS} participants (${joined} joined)`
+      : `${joined} people in the room`
   } else if (phase === 'WISHING') {
     status = `${doneWishing} of ${joined} done, ${wishes.length} ${wishes.length === 1 ? 'wish' : 'wishes'}`
   } else if (phase === 'WAITING') {
@@ -167,7 +171,7 @@ export function HostRoom({
       )
     }
   } else if (next) {
-    const blocked = phase === 'SETUP' && joined === 0
+    const blocked = phase === 'SETUP' && joined < MIN_PARTICIPANTS
     primary = (
       <button type="button" className="btn2 orange" disabled={advancing || blocked} onClick={() => run(() => advance(next))}>
         {ADVANCE_LABELS[next]}
