@@ -6,18 +6,7 @@
  * Rules in database.rules.json are the real boundary; these helpers keep the
  * client honest and typed.
  */
-import {
-  get,
-  onDisconnect,
-  onValue,
-  push,
-  ref,
-  remove,
-  runTransaction,
-  serverTimestamp,
-  set,
-  update,
-} from 'firebase/database'
+import { onDisconnect, push, ref, serverTimestamp } from 'firebase/database'
 import {
   MAX_WISHES,
   type CollectiveWish,
@@ -25,7 +14,7 @@ import {
   type Phase,
   type Wish,
 } from './domain'
-import { db } from './firebase'
+import { db, get, onValue, remove, runTransaction, set, update } from './firebase'
 import { ROSTER_SIZE } from './roster'
 
 export interface SessionMeta {

@@ -14,7 +14,7 @@ describe('RTDB rules contract (ADR 0004/0010 security invariants)', () => {
     // key must live at the top level, write-once and never readable.
     expect(rules.hostKeys).toBeDefined()
     expect(rules.hostKeys.$code).toBeDefined()
-    expect(rules.hostKeys.$code['.write']).toBe('!data.exists()')
+    expect(rules.hostKeys.$code['.write']).toBe('auth != null && (!data.exists())')
     expect(rules.hostKeys.$code['.read']).toBeUndefined()
     expect(session.meta.hostKey).toBeUndefined()
     expect(session.hostClaim).toBeUndefined()
@@ -23,13 +23,13 @@ describe('RTDB rules contract (ADR 0004/0010 security invariants)', () => {
   it('keeps the write-only claim outside the readable session subtree too', () => {
     // The claim value equals the host key — readable, it would leak the key.
     expect(rules.claims).toBeDefined()
-    expect(rules.claims.$code['.write']).toBe('true')
+    expect(rules.claims.$code['.write']).toBe('auth != null')
     expect(rules.claims.$code['.read']).toBeUndefined()
     expect(rules.claims.$code['.validate']).toContain('hostKeys')
   })
 
   it('allows session creation only — no cascading open write', () => {
-    expect(session['.write']).toBe('!data.exists()')
+    expect(session['.write']).toBe('auth != null && (!data.exists())')
   })
 
   it('gates meta, collectives, and reveal writes on a valid top-level claim', () => {
@@ -77,6 +77,20 @@ describe('RTDB rules contract (ADR 0004/0010 security invariants)', () => {
     const expr = session.avatars.$avatarId['.write'] ?? ''
     expect(expr).toContain('!data.exists()')
     expect(expr).toContain('null')
+  })
+
+  it('requires a signed-in (anonymous) client for every read and write rule', () => {
+    const exprs: string[] = []
+    const walk = (node: unknown) => {
+      if (!node || typeof node !== 'object') return
+      for (const [key, value] of Object.entries(node)) {
+        if (key === '.read' || key === '.write') exprs.push(String(value))
+        else walk(value)
+      }
+    }
+    walk(rules)
+    expect(exprs.length).toBeGreaterThan(0)
+    for (const expr of exprs) expect(expr.startsWith('auth != null')).toBe(true)
   })
 
   it('validates every field the app writes into meta', () => {
