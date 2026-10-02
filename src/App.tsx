@@ -214,7 +214,7 @@ export default function App() {
     return watchHubSessionStatus({ pin: hubPin, hostedSessionId: hubHostedSessionId, onEnded: () => setHubEnded(true) })
   }, [watchHub, hubPin, hubHostedSessionId])
 
-  const isEnded = hubEnded || (Boolean(snapshot?.meta.ended) && livePhase !== 'COMPLETE')
+  const isEnded = (hubEnded || Boolean(snapshot?.meta.ended)) && livePhase !== 'COMPLETE'
 
   // The session is already closed on the hub, so the host leaves without reporting cancel again.
   const endHandledRef = useRef(false)

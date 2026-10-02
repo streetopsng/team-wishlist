@@ -91,6 +91,8 @@ export function HostRoom({
         await applyAutoPromotion(code, hostKey, result.collectives, result.assignments)
       }
     }
+    await setPhase(code, hostKey, next)
+    // Reported after the room is COMPLETE: the report ends the hub session, and clients must see the final phase first.
     if (next === 'COMPLETE' && ggSession?.isHost) {
       void reportGummyGumResult({
         name: ggSession.player?.name || 'Host',
@@ -100,7 +102,6 @@ export function HostRoom({
         topPriority: ranking[0]?.collective.title ?? null,
       })
     }
-    await setPhase(code, hostKey, next)
   }
 
   const closeEnd = useCallback(() => setEndOpen(false), [])
