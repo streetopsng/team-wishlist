@@ -214,7 +214,7 @@ export function HostRoom({
 
       <main className="host-body">
         {phase === 'SETUP' && (
-          <HostLobby code={code} hostKey={hostKey} snapshot={snapshot} ggSession={ggSession} online={online} />
+          <HostLobby snapshot={snapshot} online={online} />
         )}
         {(phase === 'WISHING' || phase === 'WAITING') && (
           <SplitLayout
@@ -376,22 +376,9 @@ function RosterList({
   )
 }
 
-function HostLobby({
-  code,
-  hostKey,
-  snapshot,
-  ggSession,
-  online,
-}: {
-  code: string
-  hostKey: string
-  snapshot: SessionSnapshot
-  ggSession: GummyGumLaunchSession | null
-  online: number
-}) {
+function HostLobby({ snapshot, online }: { snapshot: SessionSnapshot; online: number }) {
   const joined = snapshot.participants.length
   const invited = snapshot.meta.invitedCount
-  const joinUrl = `${window.location.origin}/s/${code}`
   const pct = invited > 0 ? Math.min(100, Math.round((joined / invited) * 100)) : 0
 
   return (
@@ -426,28 +413,6 @@ function HostLobby({
             <li><strong>Prioritise</strong> Everyone spends 3 priorities.</li>
             <li><strong>Results</strong> You reveal the ranking, lowest to highest.</li>
           </ol>
-          {!ggSession && (
-            <div className="lobby-share">
-              <span className="field-readonly-label">Join link</span>
-              <div className="host-invite-row">
-                <code>{joinUrl}</code>
-                <button
-                  type="button"
-                  className="btn-plain"
-                  onClick={() => navigator.clipboard.writeText(joinUrl).catch(() => undefined)}
-                >
-                  Copy
-                </button>
-              </div>
-              <button
-                type="button"
-                className="link-btn2"
-                onClick={() => navigator.clipboard.writeText(hostKey).catch(() => undefined)}
-              >
-                Copy host key
-              </button>
-            </div>
-          )}
         </section>
       </div>
     </div>
