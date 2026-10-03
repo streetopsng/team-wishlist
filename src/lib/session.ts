@@ -329,7 +329,7 @@ export async function markDone(
   participant: Participant,
   field: 'doneWishing' | 'recapSeen' | 'doneAllocating' | 'doneResults',
 ): Promise<void> {
-  await set(ref(db, `sessions/${code}/participants/${participant.pid}/${field}`), true)
+  await withRetry(() => set(ref(db, `sessions/${code}/participants/${participant.pid}/${field}`), true))
 }
 
 export async function setTokens(
@@ -376,13 +376,40 @@ export function registerPresence(code: string, pid: string): () => void {
  * reveal) check the claim server-side. The claim is cleared in a `finally` so
  * a lingering claim can't become a standing skeleton key for the room.
  */
-async function withHost<T>(code: string, hostKey: string, fn: () => Promise<T>): Promise<T> {
+class HostClaimError extends Error {}
+
+const WRITE_ATTEMPTS = 5
+const WRITE_RETRY_MS = 1000
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (err instanceof HostClaimError || attempt >= WRITE_ATTEMPTS) throw err
+      await wait(WRITE_RETRY_MS)
+    }
+  }
+}
+
+async function claimAndRun<T>(code: string, hostKey: string, fn: () => Promise<T>): Promise<T> {
   await set(ref(db, `claims/${code}`), hostKey).catch(() => {
-    throw new Error('Host verification failed — check the host link')
+    throw new HostClaimError('Host verification failed — check the host link')
   })
   try {
     return await fn()
   } finally {
     await remove(ref(db, `claims/${code}`)).catch(() => undefined)
   }
+}
+
+// One host write at a time: overlapping calls would let the first one's cleanup
+// remove the claim the second still needs, and its write would be denied.
+let hostQueue: Promise<unknown> = Promise.resolve()
+
+function withHost<T>(code: string, hostKey: string, fn: () => Promise<T>): Promise<T> {
+  const run = hostQueue.then(() => withRetry(() => claimAndRun(code, hostKey, fn)))
+  hostQueue = run.catch(() => undefined)
+  return run
 }

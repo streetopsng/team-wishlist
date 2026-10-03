@@ -61,10 +61,12 @@ export default function App() {
   const ggRoomCode = gummyGumRoomCode(ggSession)
 
   useEffect(() => {
-    resolveGummyGumLaunch().then((gg) => {
-      setGgSession(gg)
-      setGgAccessState(gg ? 'granted' : 'denied')
-    })
+    resolveGummyGumLaunch()
+      .then((gg) => {
+        setGgSession(gg)
+        setGgAccessState(gg ? 'granted' : 'denied')
+      })
+      .catch(() => setGgAccessState('denied'))
   }, [])
 
   // Participant identity (ADR 0003): stored per session code.
@@ -130,7 +132,8 @@ export default function App() {
   useEffect(() => {
     if (!ggResolvingHost || !ggSession || !ggRoomCode || loading || ggCreateStartedRef.current) return
     const rc = ggRoomCode
-    if (snapshot) {
+    // A failed read is not "no room yet": creating one here could collide with a session in progress.
+    if (snapshot || error) {
       // Host key is write-once and never server-readable (ADR 0010), so it can't be recovered here.
       setGgResolvingHost(false)
       setGgHostRecoveryFailed(true)
@@ -151,7 +154,7 @@ export default function App() {
         setGgResolvingHost(false)
         setGgHostRecoveryFailed(true)
       })
-  }, [ggResolvingHost, ggSession, ggRoomCode, loading, snapshot])
+  }, [ggResolvingHost, ggSession, ggRoomCode, loading, snapshot, error])
 
   const [abandonedOnLoad, setAbandonedOnLoad] = useState(false)
   const abandonCheckedRef = useRef<string | null>(null)
