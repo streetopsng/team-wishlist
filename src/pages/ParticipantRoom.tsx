@@ -17,6 +17,30 @@ import { markDone, setTokens, submitWish } from '@/lib/session'
 import type { SessionSnapshot } from '@/lib/session'
 import { returnToGummyGum, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
+const SAVE_FAILED = 'Could not save — check your connection and try again'
+
+function useSave() {
+  const [error, setError] = useState<string | null>(null)
+  async function save(write: () => Promise<void>) {
+    try {
+      await write()
+      setError(null)
+    } catch {
+      setError(SAVE_FAILED)
+    }
+  }
+  return { error, save }
+}
+
+function SaveError({ message }: { message: string | null }) {
+  if (!message) return null
+  return (
+    <p role="alert" style={{ color: 'var(--orange-deep)', fontWeight: 700 }}>
+      {message}
+    </p>
+  )
+}
+
 function WaitingRoom({
   headline,
   sub,
@@ -162,6 +186,7 @@ function ParticipantWishing({
 }) {
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const done = useSave()
   const remaining = MAX_WISHES - myWishes.length
   const full = remaining <= 0
 
@@ -226,12 +251,13 @@ function ParticipantWishing({
         ))}
       </div>
       {error && <p style={{ color: 'var(--orange-deep)', fontWeight: 700 }}>{error}</p>}
+      <SaveError message={done.error} />
       <div className="wishing-footer">
         <button
           type="button"
           className="btn2 ghost full"
           disabled={myWishes.length === 0}
-          onClick={() => markDone(code, me, 'doneWishing')}
+          onClick={() => done.save(() => markDone(code, me, 'doneWishing'))}
         >
           I'm done
         </button>
@@ -253,6 +279,7 @@ function ParticipantPrioritisation({
   wishes: Wish[]
   participants: Participant[]
 }) {
+  const { error, save } = useSave()
   const used = totalTokens(me.tokens)
   const doneCount = participants.filter((p) => p.doneAllocating).length
 
@@ -268,8 +295,8 @@ function ParticipantPrioritisation({
     )
   }
 
-  async function change(tokens: Record<string, number>) {
-    await setTokens(code, me, tokens)
+  function change(tokens: Record<string, number>) {
+    return save(() => setTokens(code, me, tokens))
   }
 
   return (
@@ -303,12 +330,13 @@ function ParticipantPrioritisation({
               />
             ))}
           </div>
+          <SaveError message={error} />
           <div className="wishing-footer">
             <button
               type="button"
               className="btn2 orange full"
               disabled={used === 0}
-              onClick={() => markDone(code, me, 'doneAllocating')}
+              onClick={() => save(() => markDone(code, me, 'doneAllocating'))}
             >
               I'm done
             </button>
@@ -330,6 +358,7 @@ function RecapGate({
   collectives: CollectiveWish[]
   wishes: Wish[]
 }) {
+  const { error, save } = useSave()
   return (
     <div>
       <h2 className="phase-title">Our wishlist</h2>
@@ -339,8 +368,9 @@ function RecapGate({
           <CollectiveCard key={c.id} collective={c} wishes={wishes} />
         ))}
       </div>
+      <SaveError message={error} />
       <div className="wishing-footer">
-        <button type="button" className="btn2 orange full" onClick={() => markDone(code, me, 'recapSeen')}>
+        <button type="button" className="btn2 orange full" onClick={() => save(() => markDone(code, me, 'recapSeen'))}>
           What matters most?
         </button>
       </div>
@@ -363,6 +393,7 @@ function ParticipantResults({
   participants: Participant[]
   ggSession: GummyGumLaunchSession | null
 }) {
+  const { error, save } = useSave()
   const ranking = useMemo(() => computeRanking(collectives, participants), [collectives, participants])
   const idx = snapshot.revealIndex
   const n = ranking.length
@@ -421,9 +452,10 @@ function ParticipantResults({
       <p className="results-caption">
         {shown} of {n} revealed
       </p>
+      <SaveError message={error} />
       {revealComplete && (
         <div className="wishing-footer">
-          <button type="button" className="btn2 orange full" onClick={() => markDone(code, me, 'doneResults')}>
+          <button type="button" className="btn2 orange full" onClick={() => save(() => markDone(code, me, 'doneResults'))}>
             See our wishlist
           </button>
         </div>

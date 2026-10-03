@@ -337,7 +337,7 @@ export async function setTokens(
   participant: Participant,
   tokens: Record<string, number>,
 ): Promise<void> {
-  await set(ref(db, `sessions/${code}/participants/${participant.pid}/tokens`), tokens)
+  await withRetry(() => set(ref(db, `sessions/${code}/participants/${participant.pid}/tokens`), tokens))
 }
 
 /**
