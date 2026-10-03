@@ -1,22 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ParticipantRoom } from '@/pages/ParticipantRoom'
-import { HostCreate } from '@/pages/HostCreate'
-import { HostKeys } from '@/pages/HostKeys'
 import { HostRoom } from '@/pages/HostRoom'
 import { Join } from '@/pages/Join'
-import { Landing } from '@/pages/Landing'
 import { SessionExpiredModal } from '@/components/SessionExpiredModal'
 import { SessionEndedScreen } from '@/components/SessionEndedScreen'
+import { LoadingScreen } from '@/components/LoadingScreen'
 import { autoPromote, isLobbyIdleExpired, isSessionAbandoned } from '@/lib/domain'
 import { clearGummyGumHostKey, clearIdentity, findMe, loadGummyGumHostKey, loadIdentity, saveGummyGumHostKey, saveIdentity } from '@/lib/identity'
 import { applyAutoPromotion, createSession, generateHostKey, invitePid, markSessionAbandoned, markSessionEnded, registerPresence } from '@/lib/session'
 import { useSession } from '@/hooks/useSession'
 import { gummyGumRoomCode, reportGummyGumCancel, resolveGummyGumLaunch, returnToGummyGum, watchHubSessionStatus, type GummyGumLaunchSession } from '@/lib/gummygumSession'
 
+// Team Wishlist only runs from a GummyGum launch, so there is no landing or create route:
+// anything unrouted waits on the loading screen until the launch routes it.
 type Route =
-  | { kind: 'landing' }
-  | { kind: 'hostCreate' }
-  | { kind: 'hostKeys'; code: string; hostKey: string }
+  | { kind: 'launching' }
   | { kind: 'host'; code: string; hostKey: string }
   | { kind: 'join'; code: string }
   | { kind: 'participant'; code: string }
@@ -27,18 +25,11 @@ function parseRoute(): Route {
   const hostMatch = path.match(/^\/host\/([A-Z2-9]+)/)
   if (hostMatch) {
     const key = params.get('key')
-    return key
-      ? { kind: 'host', code: hostMatch[1], hostKey: key }
-      : { kind: 'hostCreate' }
+    return key ? { kind: 'host', code: hostMatch[1], hostKey: key } : { kind: 'launching' }
   }
   const joinMatch = path.match(/^\/s\/([A-Z2-9]+)/)
   if (joinMatch) return { kind: 'join', code: joinMatch[1] }
-  return { kind: 'landing' }
-}
-
-function navigate(to: string) {
-  window.history.pushState(null, '', to)
-  window.dispatchEvent(new PopStateEvent('popstate'))
+  return { kind: 'launching' }
 }
 
 function GummyGumLockedScreen() {
@@ -100,7 +91,7 @@ export default function App() {
   const code =
     ggResolvingHost && ggRoomCode
       ? ggRoomCode
-      : route.kind === 'host' || route.kind === 'hostKeys'
+      : route.kind === 'host'
         ? route.code
         : route.kind === 'join' || route.kind === 'participant'
           ? route.code
@@ -262,10 +253,9 @@ export default function App() {
   const claimJoin = useCallback((joinedCode: string, joinedPid: string, avatarId: string) => {
     saveIdentity({ code: joinedCode, pid: joinedPid, avatarId })
     setFreshJoin({ code: joinedCode, pid: joinedPid, avatarId })
-    // Hub codes may not match the /s/[A-Z2-9]+ route pattern.
-    if (ggSession) setRoute({ kind: 'participant', code: joinedCode })
-    else navigate(`/s/${joinedCode}`)
-  }, [ggSession])
+    // Hub codes may not match the /s/[A-Z2-9]+ route pattern, so the URL is left as launched.
+    setRoute({ kind: 'participant', code: joinedCode })
+  }, [])
 
   const me = useMemo(() => findMe(snapshot, pid), [snapshot, pid])
 
@@ -285,7 +275,7 @@ export default function App() {
     if (error) console.error('[useSession]', error)
   }
 
-  if (ggAccessState === 'checking') return <div className="screen center-screen" />
+  if (ggAccessState === 'checking') return <LoadingScreen />
   if (ggAccessState === 'denied') return <GummyGumLockedScreen />
 
   if (ggHostRecoveryFailed) {
@@ -300,35 +290,16 @@ export default function App() {
     )
   }
 
-  if (ggResolvingHost) return <Splash text="Opening control room..." />
+  if (ggResolvingHost) return <LoadingScreen />
 
   if (ggSession && isEnded && (route.kind === 'host' || route.kind === 'join' || route.kind === 'participant')) {
     return <SessionEndedScreen isHost={route.kind === 'host'} hubUrl={ggSession.hubUrl} />
   }
 
-  if (route.kind === 'landing') return <Landing onHost={() => { navigate('/host/create'); setRoute({ kind: 'hostCreate' }) }} />
-
-  if (route.kind === 'hostCreate')
-    return (
-      <HostCreate
-        onCreated={(createdCode, hostKey) => {
-          navigate(`/host/${createdCode}?key=${hostKey}`)
-          setRoute({ kind: 'hostKeys', code: createdCode, hostKey })
-        }}
-      />
-    )
-
-  if (route.kind === 'hostKeys')
-    return (
-      <HostKeys
-        code={route.code}
-        hostKey={route.hostKey}
-        onContinue={() => setRoute({ kind: 'host', code: route.code, hostKey: route.hostKey })}
-      />
-    )
+  if (route.kind === 'launching') return ggRoomCode ? <LoadingScreen /> : <GummyGumLockedScreen />
 
   if (route.kind === 'host') {
-    if (loading) return <Splash text="Opening control room…" />
+    if (loading) return <LoadingScreen />
     if (!snapshot) return <Splash text={error ?? 'Session not found — check the link.'} />
     return (
       <>
@@ -340,13 +311,13 @@ export default function App() {
 
   // Participant routes: join first if no identity for this session yet.
   if (route.kind === 'join' || route.kind === 'participant') {
-    if (loading) return <Splash text="Entering the room…" />
+    if (loading) return <LoadingScreen />
     if (!snapshot) {
       if (ggSession && !error) return <Splash text="Waiting for the host to open the room..." />
       return <Splash text={error ?? 'Session not found — check the link.'} />
     }
     if (!me) {
-      if (ggPidPending) return <Splash text="Entering the room…" />
+      if (ggPidPending) return <LoadingScreen />
       return (
         <>
           <Join
